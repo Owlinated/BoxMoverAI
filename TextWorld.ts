@@ -47,11 +47,13 @@ export class TextWorld implements World {
         console.log(" " + repeat("_", stacks.length * stackWidth - 1));
         const left = repeat(" ", this.currentState.arm * stackWidth);
         const right = repeat(" ", (stacks.length - this.currentState.arm - 1) * stackWidth);
-        let line = left + center("\\_/", stackWidth) + right;
-        console.log("|" + line.slice(1) + "|");
-        if (this.currentState.holding) {
-            const line = left + center(this.currentState.holding, stackWidth) + right;
+        {
+            let line = left + center("\\_/", stackWidth) + right;
             console.log("|" + line.slice(1) + "|");
+            if (this.currentState.holding) {
+                const line = left + center(this.currentState.holding, stackWidth) + right;
+                console.log("|" + line.slice(1) + "|");
+            }
         }
         for (let y = maxHeight; y >= 0; y--) {
             let line = "";
@@ -62,11 +64,13 @@ export class TextWorld implements World {
             console.log("|" + line.slice(1) + "|");
         }
         console.log("+" + repeat(repeat("-", stackWidth - 1) + "+", stacks.length));
-        let line = "";
-        for (let x = 0; x < stacks.length; x++) {
-            line += center(x + "", stackWidth);
+        {
+            let line = "";
+            for (let x = 0; x < stacks.length; x++) {
+                line += center(x + "", stackWidth);
+            }
+            console.log(line);
         }
-        console.log(line);
         console.log();
 
         //// Uncomment these if you want to print a list of the object identifiers and their parameters:
