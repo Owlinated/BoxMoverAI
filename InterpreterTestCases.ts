@@ -1,11 +1,11 @@
 
-/********************************************************************************
-** InterpreterTestCases
-
-This file contains several test cases, some of which have not been authored yet.
-You should add your own interpretation where it says so.
-You are also free to add new test cases.
-********************************************************************************/
+/*
+ * InterpreterTestCases
+ *
+ * This file contains several test cases, some of which have not been authored yet.
+ * You should add your own interpretation where it says so.
+ * You are also free to add new test cases.
+ */
 
 export interface TestCase {
     world : string;
@@ -184,7 +184,9 @@ testCases.push({
 testCases.push({
     world: "small",
     utterance: "put a ball in a box",
-    interpretations: [["inside(LargeWhiteBall,LargeRedBox)", "inside(LargeWhiteBall,LargeYellowBox)", "inside(SmallBlackBall,LargeRedBox)", "inside(SmallBlackBall,LargeYellowBox)", "inside(SmallBlackBall,SmallBlueBox)"]]
+    interpretations: [["inside(LargeWhiteBall,LargeRedBox)", "inside(LargeWhiteBall,LargeYellowBox)",
+        "inside(SmallBlackBall,LargeRedBox)", "inside(SmallBlackBall,LargeYellowBox)",
+        "inside(SmallBlackBall,SmallBlueBox)"]]
 });
 
 testCases.push({
@@ -278,7 +280,6 @@ testCases.push({
     utterance: "put a brick on a brick on a brick on the floor",
     interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
 });
-
 
 //////////////////////////////////////////////////////////////////////
 // Test cases for the ALL quantifier
