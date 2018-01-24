@@ -1,0 +1,13 @@
+{
+    "extends": [
+        "tslint:recommended"
+    ],
+    "jsRules": {},
+    "rules": {
+      "variable-name": [true, "allow-snake-case"],
+      "object-literal-sort-keys": [true, "match-declaration-order"],
+      "trailing-comma": [false],
+      "no-console": [false]
+    },
+    "rulesDirectory": []
+}
