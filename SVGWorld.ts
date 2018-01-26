@@ -123,6 +123,7 @@ export class SVGWorld implements World {
                 console.log("SPEAKING: " + utterance);
                 window.speechSynthesis.speak(speech);
             } catch (err) {
+                // Ignored
             }
         }
     }
@@ -209,7 +210,7 @@ export class SVGWorld implements World {
                         if (callback) { setTimeout(callback, this.promptPause * 1000); }
                     }
                 } else {
-                    if (item && item[0] != "#") {
+                    if (item && item[0] !== "#") {
                         if (this.isSpeaking()) {
                             plan.unshift(item);
                             setTimeout(performNextAction, this.animationPause * 1000);

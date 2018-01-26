@@ -21,7 +21,7 @@ $(function() {
         current = defaultWorld;
     }
     const speech: string = (getURLParameter("speech") || "").toLowerCase();
-    const useSpeech: boolean = (speech == "true" || speech == "1" || defaultSpeech);
+    const useSpeech: boolean = (speech === "true" || speech === "1" || defaultSpeech);
 
     $("#currentworld").text(current);
     $("<a>").text("reset")

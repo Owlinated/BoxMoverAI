@@ -28,8 +28,6 @@ export interface Graph<Node> {
  */
 export type CompareFunction<T> = (a: T, b: T) => number;
 
-
-
 /**
  * The class for search results: this is what the function 'aStarSearch' should return
  * If the search fails: 'status' should be 'failure' or 'timeout'; 'path' should be [] and 'cost' should be negative

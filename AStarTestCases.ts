@@ -181,7 +181,7 @@ function doubleTest(test: TestCase): TestCase {
     }
     const doublePath: Coordinate[] = test.path.slice();
     doublePath.push([test.xsize - 1, test.ysize], [test.xsize, test.ysize]);
-    for (const [x, y] of test.path){
+    for (const [x, y] of test.path) {
         doublePath.push([x + test.xsize, y + test.ysize]);
     }
     return {xsize: 2 * test.xsize, ysize: 2 * test.ysize,

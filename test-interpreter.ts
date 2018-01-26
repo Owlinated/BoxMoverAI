@@ -49,13 +49,13 @@ function runTest(testcase: TestCase): boolean {
     console.log("Correct interpretations:");
     let n = 0;
     interpretations.forEach((intp) => {
-        if (correctints.some((i) => i == intp)) {
+        if (correctints.some((i) => i === intp)) {
             n++;
             console.log(`    (${n}) ${intp}`);
         }
     });
-    if (n == correctints.length && n == interpretations.length) {
-        if (n == 0) {
+    if (n === correctints.length && n === interpretations.length) {
+        if (n === 0) {
             console.log("    There are no interpretations");
         }
         console.log();
@@ -71,7 +71,7 @@ function runTest(testcase: TestCase): boolean {
     if (n < correctints.length) {
         console.log("Missing interpretations:");
         correctints.forEach((intp) => {
-            if (!interpretations.some((j) => j == intp)) {
+            if (!interpretations.some((j) => j === intp)) {
                 console.log("    (-) " + intp);
             }
         });
@@ -80,7 +80,7 @@ function runTest(testcase: TestCase): boolean {
     if (n < interpretations.length) {
         console.log("Incorrect interpretations:");
         interpretations.forEach((intp) => {
-            if (!correctints.some((i) => i == intp)) {
+            if (!correctints.some((i) => i === intp)) {
                 n++;
                 console.log("    (" + n + ") " + intp);
             }
@@ -92,12 +92,12 @@ function runTest(testcase: TestCase): boolean {
 
 function runAllTests(argv: string[]) {
     let tests: number[] = [];
-    if (argv.length == 0) {
+    if (argv.length === 0) {
         throw new Error("Missing command-line arguments");
-    } else if (argv[0] == "all") {
+    } else if (argv[0] === "all") {
         for (let n = 0; n < testCases.length; n++) { tests.push(n); }
     } else {
-        tests = argv.map((n) => parseInt(n));
+        tests = argv.map((n) => parseInt(n, 10));
     }
 
     let failed = 0;

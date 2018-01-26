@@ -27,7 +27,7 @@ const AStarTimeout = 10; // This is the timeout used when calling the AStar func
 function checkPath<Node>(graph: Graph<Node>, startnode: Node, path: Array<Successor<Node>>): number | null {
     function getNeighbor(node: Node, next: Node): Successor<Node> | null {
         for (const suc of graph.successors(node)) {
-            if (graph.compareNodes(next, suc.child) == 0) {
+            if (graph.compareNodes(next, suc.child) === 0) {
                 return suc;
             }
         }
@@ -80,7 +80,7 @@ function runTest(testcase: TestCase, useHeuristics: boolean): TestResult {
         n = new GridNode(x, y);
         goalpath.push({action: a, child: n, cost: 1});
     }
-    const isgoal = (n: GridNode) => GridGraph.compareNodes(n, goalnode) == 0;
+    const isgoal = (n: GridNode) => GridGraph.compareNodes(n, goalnode) === 0;
     let heuristicsCtr: number;
 
     function manhattanHeuristics(n: GridNode): number {
@@ -193,7 +193,7 @@ function runAllTests(argv: string[]): void {
         console.log();
         const result: { [h: string]: TestResult } = {};
         for (const heur of allHeuristics) {
-            result[heur] = runTest(testcase, heur == manhattan);
+            result[heur] = runTest(testcase, heur === manhattan);
             total[heur].failed += result[heur].failed;
             total[heur].time += result[heur].time;
             total[heur].nodes += result[heur].nodes;

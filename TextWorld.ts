@@ -21,7 +21,7 @@ export class TextWorld implements World {
     }
 
     public printSystemOutput(output: string, participant?: string): void {
-        if (participant == "user") {
+        if (participant === "user") {
             output = '"' + output + '"';
         }
         console.log(output);

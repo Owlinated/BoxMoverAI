@@ -8,13 +8,12 @@
  */
 
 export interface TestCase {
-    world : string;
-    utterance : string;
-    interpretations : string[][]
+    world: string;
+    utterance: string;
+    interpretations: string[][];
 }
 
-export var testCases : TestCase[] = [];
-
+export let testCases: TestCase[] = [];
 
 //////////////////////////////////////////////////////////////////////
 // Examples that test the physical laws
@@ -159,14 +158,14 @@ testCases.push({
     interpretations: []
 });
 
-
 //////////////////////////////////////////////////////////////////////
 // Simple examples with a clear interpretation
 
 testCases.push({
     world: "small",
     utterance: "take an object",
-    interpretations: [["holding(LargeBlueTable)", "holding(LargeWhiteBall)", "holding(LargeRedBox)", "holding(LargeYellowBox)", "holding(SmallBlackBall)", "holding(SmallBlueBox)"]]
+    interpretations: [["holding(LargeBlueTable)", "holding(LargeWhiteBall)", "holding(LargeRedBox)",
+        "holding(LargeYellowBox)", "holding(SmallBlackBall)", "holding(SmallBlueBox)"]]
 });
 
 testCases.push({
@@ -224,7 +223,6 @@ testCases.push({
     utterance: "put a black ball in a box on the floor",
     interpretations: [["inside(SmallBlackBall,LargeYellowBox)"], ["ontop(SmallBlackBall,floor)"]]
 });
-
 
 //////////////////////////////////////////////////////////////////////
 // Examples where YOU shuold define the interpretation
