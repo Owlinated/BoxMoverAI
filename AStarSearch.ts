@@ -1,4 +1,5 @@
 import {Graph, SearchResult, Successor} from "./Graph";
+import Dictionary from "./lib/typescript-collections/src/lib/Dictionary";
 import PriorityQueue from "./lib/typescript-collections/src/lib/PriorityQueue";
 import Set from "./lib/typescript-collections/src/lib/Set";
 
@@ -28,49 +29,63 @@ export function aStarSearch<Node>(graph: Graph<Node>,
     // Find timeout time
     const endTime = Date.now() + timeout * 1000;
 
-    // Frontier is a priority queue of nodes that will be examined, it is sorted by the estimated cost of nodes
-    const frontier: PriorityQueue<SearchNode<Node>> =
-        new PriorityQueue<SearchNode<Node>>((nodeA, nodeB) => nodeB.totalCost() - nodeA.totalCost());
+    // Frontier is a collection of nodes that will be examined
+    const frontier: Frontier<Node> = new Frontier<Node>();
 
-    // Set of explored nodes, these will not be examined again
-    const visited: Set<Node> = new Set();
+    // Set of discovered nodes
+    const discovered: Set<Node> = new Set();
 
     // Initialize frontier and visited with start node
     frontier.add(new SearchNode<Node>(0, 0, {child: start, action: "", cost: 0}, undefined));
-    visited.add(start);
+    discovered.add(start);
 
     // Loop until we explored all nodes connected to start
     while (true) {
         // Test for timeout
         if (Date.now() > endTime) {
-            return new SearchResult<Node>("timeout", [], -1, visited.size());
+            return new SearchResult<Node>("timeout", [], -1, discovered.size());
         }
 
-        // Find node with min path + heuristic length
+        // Find node with min path cost + heuristic
         const currentNode = frontier.dequeue();
         if (currentNode === undefined) {
             // We explored all nodes connected to start, but none lead to goal.
-            return new SearchResult<Node>("failure", [], -1, visited.size());
+            return new SearchResult<Node>("failure", [], -1, discovered.size());
         }
 
         // Test if we reached the goal
         if (goal(currentNode.node.child)) {
             return new SearchResult<Node>(
                 "success",
-                ReconstructPathFromSearchNode(currentNode),
-                currentNode.path,
-                visited.size());
+                currentNode.reconstructPath(),
+                currentNode.pathCost,
+                discovered.size());
         }
 
-        // We are not at the goal, find unvisited successors
-        const successors: Array<Successor<Node>> = graph.successors(currentNode.node.child)
-            .filter((value) => !visited.contains(value.child));
+        // We are not at the goal, find the successors
+        const successors: Array<Successor<Node>> = graph.successors(currentNode.node.child);
 
-        // Add them to visited and frontier
+        // Update successors with shorter pathCost
         for (const successor of successors) {
-            visited.add(successor.child);
+            // Find search node in frontier
+            const searchNode = frontier.get(successor.child);
+            if (searchNode !== undefined && searchNode.pathCost > currentNode.pathCost + successor.cost) {
+                // Remark: We cannot update existing items in the queue
+                // Instead we insert a new search node for the existing node
+                frontier.add(new SearchNode<Node>(
+                    currentNode.pathCost + successor.cost,
+                    searchNode.heuristic,
+                    successor,
+                    currentNode));
+            }
+        }
+
+        // Add unvisited successors to visited and frontier
+        const unvisitedSuccessors = successors.filter((value) => !discovered.contains(value.child));
+        for (const successor of unvisitedSuccessors) {
+            discovered.add(successor.child);
             frontier.add(new SearchNode<Node>(
-                currentNode.path + successor.cost,
+                currentNode.pathCost + successor.cost,
                 heuristics(successor.child),
                 successor,
                 currentNode));
@@ -83,7 +98,7 @@ export function aStarSearch<Node>(graph: Graph<Node>,
  */
 class SearchNode<Node> {
     // Cost of path up to this node
-    public path: number;
+    public pathCost: number;
 
     // Estimated cost to goal from this node
     public heuristic: number;
@@ -95,7 +110,7 @@ class SearchNode<Node> {
     public previous: SearchNode<Node> | undefined;
 
     constructor(path: number, heuristic: number, node: Successor<Node>, previous: SearchNode<Node> | undefined) {
-        this.path = path;
+        this.pathCost = path;
         this.heuristic = heuristic;
         this.node = node;
         this.previous = previous;
@@ -105,26 +120,68 @@ class SearchNode<Node> {
      * The total estimated cost of a path over this node
      */
     public totalCost(): number {
-        return this.path + this.heuristic;
+        return this.pathCost + this.heuristic;
+    }
+
+    /**
+     * Reconstruct a path from this node by visiting all linked nodes.
+     * @returns {Array<Successor<Node>>} Path from start to search node
+     */
+    public reconstructPath(): Array<Successor<Node>> {
+        const path: Array<Successor<Node>> = [];
+
+        // Iterate over all links and reconstruct list of nodes
+        let current: SearchNode<Node> | undefined = this;
+        do {
+            path.push(current.node);
+            current = current.previous;
+        } while (current !== undefined);
+
+        // Reverse order since this list was built from end to start
+        // Skip the first item, since the start node is not expected in the path
+        return path.reverse().slice(1);
     }
 }
 
 /**
- * Reconstruct a path from searchNode by visiting all linked nodes.
- * @param {SearchNode<Node>} searchNode: Final node of path (contains links to previous nodes)
- * @returns {Array<Successor<Node>>} Path from start to search node
+ * Combines a priority queue with a dictionary, to allow quick ordered and lookup access to frontier
  */
-function ReconstructPathFromSearchNode<Node>(searchNode: SearchNode<Node>): Array<Successor<Node>> {
-    const path: Array<Successor<Node>> = [];
+class Frontier<Node> {
+    // Priority queue for quick access to next element
+    private queue: PriorityQueue<SearchNode<Node>> =
+        new PriorityQueue<SearchNode<Node>>((nodeA, nodeB) => nodeB.totalCost() - nodeA.totalCost());
 
-    // Iterate over all links and reconstruct list of nodes
-    let current: SearchNode<Node> | undefined = searchNode;
-    do {
-        path.push(current.node);
-        current = current.previous;
-    } while (current !== undefined);
+    // Dictionary for quick access by node
+    private nodeDictionary: Dictionary<Node, SearchNode<Node>> =
+        new Dictionary<Node, SearchNode<Node>>();
 
-    // Reverse order since this list was built from end to start
-    // Skip the first item, since the start node is not expected in the path
-    return path.reverse().slice(1);
+    /**
+     * Add search node to all internal collections
+     * @param {SearchNode<Node>} searchNode: The new item
+     */
+    public add(searchNode: SearchNode<Node>): void {
+        this.queue.add(searchNode);
+        this.nodeDictionary.setValue(searchNode.node.child, searchNode);
+    }
+
+    /**
+     * Get and remove the node with the lowest estimated cost
+     * @returns {SearchNode<Node> | undefined}
+     */
+    public dequeue(): SearchNode<Node> | undefined {
+        const result = this.queue.dequeue();
+        if (result !== undefined) {
+            this.nodeDictionary.remove(result.node.child);
+        }
+        return result;
+    }
+
+    /**
+     * Get the search node associated with node
+     * @param {Node} node: The node that is part of the resulting search node
+     * @returns {SearchNode<Node> | undefined} A search node that contains node
+     */
+    public get(node: Node): SearchNode<Node> | undefined {
+        return this.nodeDictionary.getValue(node);
+    }
 }
