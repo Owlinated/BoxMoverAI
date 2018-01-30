@@ -36,11 +36,11 @@ export function aStarSearch<Node>(graph: Graph<Node>,
     const visited: Set<Node> = new Set();
 
     // Initialize frontier and visited with start node
-    frontier.add(new SearchNode<Node>(0, 0, {child: start, action: null, cost: 0}, null));
+    frontier.add(new SearchNode<Node>(0, 0, {child: start, action: "", cost: 0}, undefined));
     visited.add(start);
 
     // Loop until we explored all nodes connected to start
-    while (!frontier.isEmpty()) {
+    while (true) {
         // Test for timeout
         if (Date.now() > endTime) {
             return new SearchResult<Node>("timeout", [], -1, visited.size());
@@ -48,6 +48,10 @@ export function aStarSearch<Node>(graph: Graph<Node>,
 
         // Find node with min path + heuristic length
         const currentNode = frontier.dequeue();
+        if (currentNode === undefined) {
+            // We explored all nodes connected to start, but none lead to goal.
+            return new SearchResult<Node>("failure", [], -1, visited.size());
+        }
 
         // Test if we reached the goal
         if (goal(currentNode.node.child)) {
@@ -72,9 +76,6 @@ export function aStarSearch<Node>(graph: Graph<Node>,
                 currentNode));
         }
     }
-
-    // We explored all nodes connected to start, but none lead to goal.
-    return new SearchResult<Node>("failure", null, null, visited.size());
 }
 
 /**
@@ -91,9 +92,9 @@ class SearchNode<Node> {
     public node: Successor<Node>;
 
     // The previous node. This implicitly saves the entire path
-    public previous: SearchNode<Node> | null;
+    public previous: SearchNode<Node> | undefined;
 
-    constructor(path: number, heuristic: number, node: Successor<Node>, previous: SearchNode<Node> | null) {
+    constructor(path: number, heuristic: number, node: Successor<Node>, previous: SearchNode<Node> | undefined) {
         this.path = path;
         this.heuristic = heuristic;
         this.node = node;
@@ -117,11 +118,11 @@ function ReconstructPathFromSearchNode<Node>(searchNode: SearchNode<Node>): Arra
     const path: Array<Successor<Node>> = [];
 
     // Iterate over all links and reconstruct list of nodes
-    let current: SearchNode<Node> = searchNode;
+    let current: SearchNode<Node> | undefined = searchNode;
     do {
         path.push(current.node);
         current = current.previous;
-    } while (current != null);
+    } while (current !== undefined);
 
     // Reverse order since this list was built from end to start
     // Skip the first item, since the start node is not expected in the path
