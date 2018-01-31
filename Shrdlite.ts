@@ -1,9 +1,9 @@
 
-import {World} from "./World";
-import {ShrdliteResult} from "./Types";
-import {parse} from "./Parser";
 import {interpret} from "./Interpreter";
+import {parse} from "./Parser";
 import {plan} from "./Planner";
+import {ShrdliteResult} from "./Types";
+import {World} from "./World";
 
 /********************************************************************************
 ** Shrdlite
@@ -11,13 +11,13 @@ import {plan} from "./Planner";
 This module contains toplevel functions for the interaction loop, and
 the pipeline that calls the parser, the interpreter and the planner.
 
-You should do some minor changes to the function 'parseUtteranceIntoPlan', 
+You should do some minor changes to the function 'parseUtteranceIntoPlan',
 look for PLACEHOLDER below.
 Everything else can be left as they are.
 ********************************************************************************/
 
-
-/* Generic function that takes an utterance and returns a plan. It works according to the following pipeline:
+/**
+ * Generic function that takes an utterance and returns a plan. It works according to the following pipeline:
  * - first it parses the utterance (Parser.ts)
  * - then it interprets the parse(s) (Interpreter.ts)
  * - then it creates plan(s) for the interpretation(s) (Planner.ts)
@@ -38,19 +38,20 @@ Everything else can be left as they are.
  *
  * @param world: The current world.
  * @param utterance: The string that represents the command.
- * @returns: A plan in the form of a stack of strings, where each element 
- *           is either a robot action, like "p" (for pick up) or "r" (for going right), 
+ * @returns: A plan in the form of a stack of strings, where each element
+ *           is either a robot action, like "p" (for pick up) or "r" (for going right),
  *           or a system utterance in English that describes what the robot is doing.
  */
-
-export function parseUtteranceIntoPlan(world : World, utterance : string) : string[] | null {
-    var parses, interpretations, plans : string | ShrdliteResult[];
+export function parseUtteranceIntoPlan(world: World, utterance: string): string[] | null {
+    let parses;
+    let interpretations;
+    let plans: string | ShrdliteResult[];
 
     // Call the parser with the utterance, and then log the parse results
     world.printDebugInfo(`Parsing utterance: "${utterance}"`);
     try {
         parses = parse(utterance);
-    } catch(err) {
+    } catch (err) {
         world.printError("[Parsing failure]", err);
         return null;
     }
@@ -62,7 +63,7 @@ export function parseUtteranceIntoPlan(world : World, utterance : string) : stri
     // Call the interpreter for all parses, and then log the interpretations
     try {
         interpretations = interpret(parses, world.currentState);
-    } catch(err) {
+    } catch (err) {
         world.printError("[Interpretation failure]", err);
         return null;
     }
@@ -83,7 +84,7 @@ export function parseUtteranceIntoPlan(world : World, utterance : string) : stri
     // Call the planner for all interpretations, and then log the resulting plans
     try {
         plans = plan(interpretations, world.currentState);
-    } catch(err) {
+    } catch (err) {
         world.printError("[Planning failure]", err);
         return null;
     }
@@ -92,8 +93,8 @@ export function parseUtteranceIntoPlan(world : World, utterance : string) : stri
         world.printDebugInfo(`  (${n}) ${result.plan.toString()}`);
     });
 
-    var finalPlan : string[] = [];
-    if (plans.length == 1) {
+    let finalPlan: string[] = [];
+    if (plans.length === 1) {
         // if only one plan was found, it's the one we return
         finalPlan = plans[0].plan;
     } else {
@@ -113,15 +114,15 @@ export function parseUtteranceIntoPlan(world : World, utterance : string) : stri
     return finalPlan;
 }
 
-
-// A convenience function that recognizes strings of the form "p r r d l p r d".
-// You don't have to change this function.
-
-export function splitStringIntoPlan(planstring : string) : string[] | null {
-    var theplan : string[] = planstring.trim().split(/\s+/);
-    var actions : {[act:string] : string}
-        = {p:"Picking", d:"Dropping", l:"Going left", r:"Going right"};
-    for (var i = theplan.length-1; i >= 0; i--) {
+/*
+ * A convenience function that recognizes strings of the form "p r r d l p r d".
+ * You don't have to change this function.
+ */
+export function splitStringIntoPlan(planstring: string): string[] | null {
+    const theplan: string[] = planstring.trim().split(/\s+/);
+    const actions: {[act: string]: string}
+        = {p: "Picking", d: "Dropping", l: "Going left", r: "Going right"};
+    for (let i = theplan.length - 1; i >= 0; i--) {
         if (!actions[theplan[i]]) {
             return null;
         }

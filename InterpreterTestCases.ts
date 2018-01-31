@@ -1,20 +1,19 @@
 
-/********************************************************************************
-** InterpreterTestCases
-
-This file contains several test cases, some of which have not been authored yet.
-You should add your own interpretation where it says so.
-You are also free to add new test cases.
-********************************************************************************/
+/*
+ * InterpreterTestCases
+ *
+ * This file contains several test cases, some of which have not been authored yet.
+ * You should add your own interpretation where it says so.
+ * You are also free to add new test cases.
+ */
 
 export interface TestCase {
-    world : string;
-    utterance : string;
-    interpretations : string[][]
+    world: string;
+    utterance: string;
+    interpretations: string[][];
 }
 
-export var testCases : TestCase[] = [];
-
+export let testCases: TestCase[] = [];
 
 //////////////////////////////////////////////////////////////////////
 // Examples that test the physical laws
@@ -159,14 +158,14 @@ testCases.push({
     interpretations: []
 });
 
-
 //////////////////////////////////////////////////////////////////////
 // Simple examples with a clear interpretation
 
 testCases.push({
     world: "small",
     utterance: "take an object",
-    interpretations: [["holding(LargeBlueTable)", "holding(LargeWhiteBall)", "holding(LargeRedBox)", "holding(LargeYellowBox)", "holding(SmallBlackBall)", "holding(SmallBlueBox)"]]
+    interpretations: [["holding(LargeBlueTable)", "holding(LargeWhiteBall)", "holding(LargeRedBox)",
+        "holding(LargeYellowBox)", "holding(SmallBlackBall)", "holding(SmallBlueBox)"]]
 });
 
 testCases.push({
@@ -184,7 +183,9 @@ testCases.push({
 testCases.push({
     world: "small",
     utterance: "put a ball in a box",
-    interpretations: [["inside(LargeWhiteBall,LargeRedBox)", "inside(LargeWhiteBall,LargeYellowBox)", "inside(SmallBlackBall,LargeRedBox)", "inside(SmallBlackBall,LargeYellowBox)", "inside(SmallBlackBall,SmallBlueBox)"]]
+    interpretations: [["inside(LargeWhiteBall,LargeRedBox)", "inside(LargeWhiteBall,LargeYellowBox)",
+        "inside(SmallBlackBall,LargeRedBox)", "inside(SmallBlackBall,LargeYellowBox)",
+        "inside(SmallBlackBall,SmallBlueBox)"]]
 });
 
 testCases.push({
@@ -222,7 +223,6 @@ testCases.push({
     utterance: "put a black ball in a box on the floor",
     interpretations: [["inside(SmallBlackBall,LargeYellowBox)"], ["ontop(SmallBlackBall,floor)"]]
 });
-
 
 //////////////////////////////////////////////////////////////////////
 // Examples where YOU shuold define the interpretation
@@ -278,7 +278,6 @@ testCases.push({
     utterance: "put a brick on a brick on a brick on the floor",
     interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
 });
-
 
 //////////////////////////////////////////////////////////////////////
 // Test cases for the ALL quantifier
