@@ -12,7 +12,8 @@
       "interface-name": [true, "never-prefix"],
       "object-literal-sort-keys": [true, "match-declaration-order"],
       "trailing-comma": [false],
-      "no-console": [false]
+      "no-console": [false],
+      "ban-types": [false]
     },
     "rulesDirectory": []
 }
