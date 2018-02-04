@@ -1,4 +1,5 @@
 
+import {IDictionaryPair} from "./lib/typescript-collections/src/lib/Dictionary";
 import {WorldState} from "./World";
 
 import {
@@ -8,8 +9,8 @@ import {
     MoveCommand, Object, RelativeObject,
     ShrdliteResult, SimpleObject, TakeCommand,
 } from "./Types";
+
 import * as util from "./lib/typescript-collections/src/lib/util";
-import {IDictionaryPair} from "./lib/typescript-collections/src/lib/Dictionary";
 
 /*
  * Interpreter
