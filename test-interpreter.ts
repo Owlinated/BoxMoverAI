@@ -91,9 +91,32 @@ function runTest(testcase : TestCase) : boolean {
         });
         console.log();
     }
+    interpretations.forEach((intp) => {
+        if (!correctints.some((i) => isInterpretationMatch(i, intp))) {
+            console.log("Truly Incorrect interpretations:");
+            console.log("    (" + n + ") " + intp);
+            console.log("");
+        }
+    });
     return false;
 }
 
+function isInterpretationMatch(test: string, correct: string){
+    const testSplit = test.split(" | ");
+    const correctSplit = correct.split(" | ");
+    if (testSplit.length !== correctSplit.length) {
+        return false;
+    }
+
+    testSplit.sort();
+    correctSplit.sort();
+    for (let i = 0; i < testSplit.length; ++i) {
+        if (testSplit[i] !== correctSplit[i]){
+            return false;
+        }
+    }
+    return true;
+}
 
 function runAllTests(argv : string[]) {
     var tests : number[] = [];
