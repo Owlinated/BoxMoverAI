@@ -52,7 +52,9 @@ export function interpret(parses: ShrdliteResult[], world: WorldState): Shrdlite
     const errors: string[] = [];
     const interpretations: ShrdliteResult[] = [];
     const interpreter: Interpreter = new Interpreter(world);
+
     for (const result of parses) {
+      console.log(result);
         try {
             const intp: DNFFormula = interpreter.interpretCommand(result.parse);
             result.interpretation = intp;
@@ -76,8 +78,8 @@ export function interpret(parses: ShrdliteResult[], world: WorldState): Shrdlite
 class Interpreter {
     constructor(
         private world: WorldState,
-    ) {}
 
+    ) {}
     /**
      * The main interpretation method.
      * Note that you should not change the API (type) of this method, only its body.
@@ -93,6 +95,7 @@ class Interpreter {
         // Instead it should call the other interpretation methods for
         // each of its arguments (cmd.entity and/or cmd.location).
         let interpretation: DNFFormula;
+        let locations: LocationSemantics[]
 
         const all_objects: string[] = Array.prototype.concat.apply([], this.world.stacks);
         if (this.world.holding) {
@@ -100,20 +103,62 @@ class Interpreter {
         }
 
         if (cmd instanceof MoveCommand) {
-            const possibleA = this.interpretEntity(cmd.entity);
-            const a = all_objects[Math.floor(Math.random() * all_objects.length)];
-            const b = all_objects[Math.floor(Math.random() * all_objects.length)];
-            if (a === b) {
+            const a = this.interpretEntity(cmd.entity);
+            const b = this.interpretLocation(cmd.location);
+
+            if(a.objects.length === 0 || b.entity.objects.length === 0 ) {
+                throw new Error("One of the forms that was entered does not exist in the current world");
+            }
+            if (a.objects === b.entity.objects) {
                 throw new Error("Cannot put an object ontop of itself");
             }
+            if (a.objects[0].form === "ball" && (b.entity.objects[0].form !== "box" && b.entity.objects[0].form !== "floor")) {
+                throw new Error("Cannot put a ball on a " + b.entity.objects[0].form);
+            }
+            if ((b.entity.objects[0].form === "box" && b.relation !== "inside") || (b.entity.objects[0].form !== "box" && b.relation === "inside") ) {
+                throw new Error("Tried putting something ontop/inside of a " + b.entity.objects[0].form);
+            }
+
+            if(!this.checkLarge(b.entity.objects)) {
+                if(!this.checkSmall(a.objects)) {
+                    throw new Error("Small objects cannot support large objects");
+                }
+            }
+
+            if (b.relation === "inside" && b.entity.objects[0].form === "box" && ["pyramid", "plank", "box"].indexOf(a.objects[0].form)+1) {
+              if(!this.checkLarge(b.entity.objects)) {
+                  throw new Error("Cannot store a " + a.objects[0].form + " in a small box");
+              }
+
+              if(!this.checkSmall(a.objects)) {
+                  throw new Error("There are no small pyramids, planks or boxes so we cannot store them in a box");
+              }
+              //If there are large boxes and small pyramids, planks or boxes, remove small boxes and large objects from respective arrays.
+              b.entity.objects.slice().reverse().forEach((removeSmall, index, object) => {if(removeSmall.size === "small") { b.entity.objects.splice(object.length - 1 - index,1); }});
+              a.objects.slice().reverse().forEach((removeLarge, index, object) => {if(removeLarge.size === "large") { a.objects.splice(object.length - 1 -index,1); } });
+          }
+
+          if (a.objects[0].form === "box" && ["pyramid", "brick"].indexOf(b.entity.objects[0].form)+1) {
+            if(this.checkSmall(a.objects)) {
+                if(this.checkLarge(b.entity.objects)) {
+                    a.objects.slice().reverse().forEach((removeLarge, index, object) => {if(removeLarge.size === "large") { a.objects.splice(object.length - 1 -index,1); } });
+                    b.entity.objects.slice().reverse().forEach((removeSmall, index, object) => {if(removeSmall.size === "small") { b.entity.objects.splice(object.length - 1 - index,1); }});
+                } else {
+                    throw new Error("Cannot put a box ontop of a small " + b.entity.objects[0].form);
+                }
+            }
+          }
+
             interpretation = new DNFFormula([
                 new Conjunction([ // ontop(a, b) & ontop(b, floor)
-                    new Literal("ontop", [a, b]),
-                    new Literal("ontop", [b, "floor"]),
+                    new Literal(b.relation, [this.getObjectName(a.objects[0]), this.getObjectName(b.entity.objects[0])]),
                 ]),
             ]);
         } else if (cmd instanceof TakeCommand) {
             const a = all_objects[Math.floor(Math.random() * all_objects.length)];
+            if(!this.world.holding){
+                throw new Error("I'm already holding something");
+            }
             interpretation = new DNFFormula([
                 new Conjunction([ // holding(a)
                     new Literal("holding", [a]),
@@ -182,19 +227,19 @@ class Interpreter {
         // TODO check rules for relation (see docs/rules.md)
         switch (location.relation) {
             case "leftof":
-                throw new Error("Not implemented");
+                return{relation: "leftof", entity: entity}
             case "rightof":
-                throw new Error("Not implemented");
+                return{relation: "rightof", entity: entity}
             case "beside":
-                throw new Error("Not implemented");
+                return{relation: "beside", entity: entity}
             case "inside":
-                throw new Error("Not implemented");
+                return{relation: "inside", entity: entity}
             case "ontop":
-                throw new Error("Not implemented");
+                return{relation: "ontop", entity: entity}
             case "under":
-                throw new Error("Not implemented");
+                return{relation: "under", entity: entity}
             case "above":
-                throw new Error("Not implemented");
+                return{relation: "above", entity: entity}
             default:
                 throw new Error(`Unknown relation: ${location.relation}`);
         }
@@ -207,7 +252,10 @@ class Interpreter {
      */
     public getObjects(filterObject: Object): SimpleObject[] {
         if (filterObject instanceof SimpleObject) {
-            let result = this.getSimpleObjects().filter((simpleObj) => simpleObj.form === filterObject.form);
+            let result = this.getSimpleObjects();
+            if (filterObject.form !== "anyform") {
+              result = result.filter((simpleObj) => simpleObj.form === filterObject.form);
+            }
             if (filterObject.color !== null) {
                result = result.filter((simpleObj) => simpleObj.color === filterObject.color);
             }
@@ -215,9 +263,33 @@ class Interpreter {
                result = result.filter((simpleObj) => simpleObj.size === filterObject.size);
             }
             return result;
+        } else {
+              let result = this.getObjectsOfRelative(filterObject.object);
+              //locations = this.interpretLocation(filterObject.location);
+              return result;
         }
-        // TODO relative object
-        throw new Error("Not implemented");
+    }
+
+    private getObjectsOfRelative(filterObject: Object): SimpleObject[] {
+        let array: SimpleObject[] = [];
+        if(filterObject instanceof SimpleObject) {
+          let array = this.getSimpleObjects()
+          if (filterObject.form !== "anyform") {
+            array = array.filter((simpleObj) => simpleObj.form === filterObject.form);
+          }
+          if (filterObject.color !== null) {
+             array = array.filter((simpleObj) => simpleObj.color === filterObject.color);
+          }
+          if (filterObject.size !== null) {
+             array = array.filter((simpleObj) => simpleObj.size === filterObject.size);
+          }
+          return array;
+        } else {
+          array = this.getObjectsOfRelative(filterObject.object);
+
+          return array;
+        }
+
     }
 
     /**
@@ -248,6 +320,18 @@ class Interpreter {
             }
         }
         throw new Error("Could not find object");
+    }
+
+    private checkLarge(objs: SimpleObject[]): boolean {
+        let hasLarge: boolean = false;
+        objs.forEach((testLength) => {if(testLength.size === "large") {hasLarge = true}});
+        return hasLarge;
+    }
+
+    private checkSmall(objs: SimpleObject[]): boolean {
+        let hasSmall: boolean = false;
+        objs.forEach((testSmall) => {if(testSmall.size === "small") {hasSmall = true}});
+        return hasSmall;
     }
 
 }
