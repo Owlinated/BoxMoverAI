@@ -62,7 +62,7 @@ export class WhereisCommand {
 */
 
 export class Location {
-    constructor(public relation: string,
+    constructor(public relation: Relation,
                 public entity: Entity) {}
     public toString(): string {return `Location(${this.relation}, ${this.entity.toString()})`; }
     public clone(): Location {return new Location(this.relation, this.entity.clone()); }
@@ -95,7 +95,7 @@ export class SimpleObject {
 export type Size = "small" | "large";
 export type Color = "red" | "black" | "blue" | "green" | "yellow" | "white";
 export type Form = "anyform" | "brick" | "plank" | "ball" | "pyramid" | "box" | "table" | "floor";
-export type Relation = "leftof" | "rightof" | "inside" | "ontop" | "under" | "beside" | "above";
+export type Relation = "leftof" | "rightof" | "inside" | "ontop" | "under" | "beside" | "above" | "holding";
 //////////////////////////////////////////////////////////////////////
 // Interpretations
 
