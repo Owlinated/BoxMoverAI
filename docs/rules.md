@@ -22,3 +22,8 @@ Below is a list of all rules grouped by the module asserting them.
  - Boxes cannot contain pyramids, planks or boxes of the same size.
  - Small boxes cannot be supported by small bricks or pyramids.
  - Large boxes cannot be supported by large pyramids.
+
+# Clarification
+Can obejcts really be placed ontop of pyramids?
+Small boxes cannot be supported by (small bricks) or (pyramids).
+Small boxes cannot be supported by (small (bricks) or (pyramids)).
