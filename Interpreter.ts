@@ -1,4 +1,3 @@
-import {IDictionaryPair} from "./lib/typescript-collections/src/lib/Dictionary";
 import {WorldState} from "./World";
 
 import {
@@ -10,8 +9,6 @@ import {
 } from "./Types";
 
 import * as util from "./lib/typescript-collections/src/lib/util";
-import {listenerCount} from "cluster";
-import {forEach} from "./lib/typescript-collections/src/lib/arrays";
 
 /*
  * Interpreter
@@ -85,24 +82,21 @@ class Interpreter {
      */
     private floor = new SimpleObject("floor", null, null);
 
+    public interpretCommand(cmd: Command): DNFFormula {
+        const result = this.interpretCommandInternal(cmd);
+        if (result.conjuncts.length === 0) {
+            throw new Error("Can not interpret command");
+        }
+        return result;
+    }
+
     /**
      * The main interpretation method.
-     * Note that you should not change the API (type) of this method, only its body.
-     * This method should call the mutually recursive methods
-     * 'interpretEntity', 'interpretLocation' and 'interpretObject'
      * @param cmd: An object of type 'Command'.
      * @returns: A DNFFormula representing the interpretation of the user's command.
      *           If there's an interpretation error, it throws an error with a string description.
      */
-    public interpretCommand(cmd: Command): DNFFormula {
-        // Todo add function that checks rules on literal
-        // Todo check rules
-
-        const all_objects: string[] = Array.prototype.concat.apply([], this.world.stacks);
-        if (this.world.holding) {
-            all_objects.push(this.world.holding);
-        }
-
+    private interpretCommandInternal(cmd: Command): DNFFormula {
         if (cmd instanceof MoveCommand) {
             const entity = this.interpretEntity(cmd.entity);
             const location = this.interpretLocation(cmd.location);
@@ -114,7 +108,10 @@ class Interpreter {
                     for (const object of entity.objects) {
                         for (const constraint of location.entity.objects) {
                             const args = [this.getObjectName(object), this.getObjectName(constraint)];
-                            conjunction.push(new Literal(location.relation, args));
+                            const literal = new Literal(location.relation, args);
+                            if (this.isLiteralValid(literal)) {
+                                conjunction.push(literal);
+                            }
                         }
                     }
                     return new DNFFormula([new Conjunction(conjunction)]);
@@ -126,9 +123,14 @@ class Interpreter {
                         const conjunction: Literal[] = [];
                         for (const object of entity.objects) {
                             const args = [this.getObjectName(object), this.getObjectName(constraint)];
-                            conjunction.push(new Literal(location.relation, args));
+                            const literal = new Literal(location.relation, args);
+                            if (this.isLiteralValid(literal)) {
+                                conjunction.push(literal);
+                            }
                         }
-                        disjunction.push(new Conjunction(conjunction));
+                        if (conjunction.length > 0) {
+                            disjunction.push(new Conjunction(conjunction));
+                        }
                     }
                     return new DNFFormula(disjunction);
                 }
@@ -149,9 +151,14 @@ class Interpreter {
                         for (let j = 0; j < entity.objects.length; ++j) {
                             const args = [this.getObjectName(entity.objects[j]),
                                 this.getObjectName(location.entity.objects[counter[j]])];
-                            conjunction.push(new Literal(location.relation, args));
+                            const literal = new Literal(location.relation, args);
+                            if (this.isLiteralValid(literal)) {
+                                conjunction.push(literal);
+                            }
                         }
-                        disjunction.push(new Conjunction(conjunction));
+                        if (conjunction.length > 0) {
+                            disjunction.push(new Conjunction(conjunction));
+                        }
 
                         // Increment counter (base of constraint count)
                         for (let j = entity.objects.length - 1; j > 0; --j) {
@@ -170,37 +177,50 @@ class Interpreter {
                     for (const object of entity.objects) {
                         for (const constraint of location.entity.objects) {
                             const args = [this.getObjectName(object), this.getObjectName(constraint)];
-                            disjunction.push(new Conjunction([new Literal(location.relation, args)]));
+                            const literal = new Literal(location.relation, args);
+                            if (this.isLiteralValid(literal)) {
+                                disjunction.push(new Conjunction([literal]));
+                            }
                         }
                     }
                     return new DNFFormula(disjunction);
                 }
             }
         } else if (cmd instanceof TakeCommand) {
-            const entity = this.interpretEntity(cmd.entity);
-            if (!this.world.holding) {
-                throw new Error("I'm already holding something");
+            if (this.world.holding) {
+                return new DNFFormula([]);
             }
 
-            return new DNFFormula([
-                new Conjunction([
-                    // holding(a)
-                    new Literal("holding", [this.getObjectName(entity)]),
-                ]),
-            ]);
+            // We cannot pick up more than one object at a time
+            const entity = this.interpretEntity(cmd.entity);
+            if (entity.junction === Junction.Conjunction && entity.objects.length > 1) {
+                return new DNFFormula([]);
+            }
+
+            // One conjunction term per object
+            const disjunction: Conjunction[] = [];
+            for (const objects of entity.objects) {
+                const literal = new Literal("holding", [this.getObjectName(objects)]);
+                if (this.isLiteralValid(literal)) {
+                    disjunction.push(new Conjunction([literal]));
+                }
+            }
+            return new DNFFormula(disjunction);
         } else if (cmd instanceof DropCommand) {
             if (!this.world.holding) {
-                throw new Error("I'm not holding anything");
+                return new DNFFormula([]);
             }
-            const location = this.interpretLocation(cmd.location);
 
-            // todo rule: check inside box vs ontop of other stuff
+            const location = this.interpretLocation(cmd.location);
             if (location.entity.junction === Junction.Conjunction) {
                 // One big conjunction term with all constraints
                 const conjunction: Literal[] = [];
                 for (const constraint of location.entity.objects) {
                     const args = [this.world.holding, this.getObjectName(constraint)];
-                    conjunction.push(new Literal(cmd.location.relation, args));
+                    const literal = new Literal(cmd.location.relation, args);
+                    if (this.isLiteralValid(literal)) {
+                        conjunction.push(literal);
+                    }
                 }
                 return new DNFFormula([new Conjunction(conjunction)]);
             } else {
@@ -208,7 +228,10 @@ class Interpreter {
                 const disjunction: Conjunction[] = [];
                 for (const constraint of location.entity.objects) {
                     const args = [this.world.holding, this.getObjectName(constraint)];
-                    disjunction.push(new Conjunction([new Literal(cmd.location.relation, args)]));
+                    const literal = new Literal(cmd.location.relation, args);
+                    if (this.isLiteralValid(literal)) {
+                        disjunction.push(new Conjunction([literal]));
+                    }
                 }
                 return new DNFFormula(disjunction);
             }
@@ -288,24 +311,88 @@ class Interpreter {
      * @param {Literal} literal: The literal to check
      * @returns {boolean} True if literal is allowed by rules, false otherwise
      */
-    private validateLiteral(literal: Literal): boolean {
+    private isLiteralValid(literal: Literal): boolean {
+        // Cannot manipulate the floor
+        if (literal.args.length > 0 && literal.args[0] === this.getObjectName(this.floor)) {
+            return false;
+        }
+
+        // Check holding separately
+        if (literal.relation === "holding") {
+            return true;
+        }
+
+        // All other relations take two arguments (for now)
+        if (literal.args.length !== 2) {
+            return false;
+        }
+        const objectA = this.getObject(literal.args[0]);
+        const objectB = this.getObject(literal.args[1]);
+        if (objectA === objectB) {
+            return false;
+        }
+
+        // Apply rules specific to relations
         switch (literal.relation) {
             case "leftof":
-                break;
+                return true;
             case "rightof":
-                break;
+                return true;
             case "inside":
-                break;
+                if (objectB.form !== "box") {
+                    return false;
+                }
+                if (objectA.size === "large" && objectB.size === "small") {
+                    return false;
+                }
+                if (objectA.form === "pyramid" || objectA.form === "plank" || objectA.form === "box") {
+                    if (objectB.size === "small" || objectA.size === "large") {
+                        return false;
+                    }
+                }
+                return true;
             case "ontop":
-                break;
+                if (objectB.form === "box" || objectB.form === "ball") {
+                    return false;
+                }
+                if (objectA.form === "ball" && objectB !== this.floor) {
+                    return false;
+                }
+                if (objectA.size === "large" && objectB.size === "small") {
+                    return false;
+                }
+                if (objectA.form === "box" && objectA.size === "small") {
+                    if ((objectB.form === "brick" || objectB.form === "pyramid") && objectB.size === "small") {
+                        return false;
+                    }
+                }
+                if (objectA.form === "box" && objectA.size === "large") {
+                    if (objectB.form === "pyramid") {
+                        return false;
+                    }
+                }
+                return true;
             case "under":
-                break;
+                if (objectA.form === "ball") {
+                    return false;
+                }
+                if (objectA.size === "small" && objectB.size === "large") {
+                    return false;
+                }
+                return true;
             case "beside":
-                break;
+                return true;
             case "above":
-                break;
+                if (objectB.form === "ball") {
+                    return false;
+                }
+                if (objectB.size === "small" && objectA.size === "large") {
+                    return false;
+                }
+                return true;
+            default:
+                throw new Error(`Unknown relatio: ${literal.relation}`);
         }
-        throw new Error(`Unknown relatio: ${literal.relation}`);
     }
 
     /**
@@ -335,19 +422,27 @@ class Interpreter {
             && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) - 1
             === this.world.stacks[stackA].indexOf(this.getObjectName(objectB))
             && objectB.form === "box",
-        ontop: (objectA, stackA, objectB, stackB) =>
-            stackA === stackB
-            && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) - 1
-            === this.world.stacks[stackA].indexOf(this.getObjectName(objectB))
-            && objectB.form !== "box",
+        ontop: (objectA, stackA, objectB, stackB) => {
+            if (objectB === this.floor) {
+                return this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) === 0;
+            }
+            return stackA === stackB
+                && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) - 1
+                === this.world.stacks[stackA].indexOf(this.getObjectName(objectB))
+                && objectB.form !== "box";
+        },
         under: (objectA, stackA, objectB, stackB) =>
             stackA === stackB
             && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) <
             this.world.stacks[stackA].indexOf(this.getObjectName(objectB)),
-        above: (objectA, stackA, objectB, stackB) =>
-            stackA === stackB
-            && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) >
-            this.world.stacks[stackA].indexOf(this.getObjectName(objectB)),
+        above: (objectA, stackA, objectB, stackB) => {
+            if (objectB === this.floor) {
+                return true;
+            }
+            return stackA === stackB
+                && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) >
+                this.world.stacks[stackA].indexOf(this.getObjectName(objectB));
+        }
     };
 
     /**
@@ -363,7 +458,8 @@ class Interpreter {
             const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
                 const stackA = this.getStackId(objectA);
                 const stackB = this.getStackId(objectB);
-                if (stackA === undefined || stackB === undefined) {
+                if ((stackA === undefined && objectA !== this.floor)
+                    || (stackB === undefined && objectB !== this.floor)) {
                     return false;
                 }
                 return this.relationTesters[filterLocation.relation](objectA, stackA, objectB, stackB);
