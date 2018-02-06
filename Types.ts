@@ -95,7 +95,7 @@ export class SimpleObject {
 export type Size = "small" | "large";
 export type Color = "red" | "black" | "blue" | "green" | "yellow" | "white";
 export type Form = "anyform" | "brick" | "plank" | "ball" | "pyramid" | "box" | "table" | "floor";
-
+export type Relation = "leftof" | "rightof" | "inside" | "ontop" | "under" | "beside" | "above";
 //////////////////////////////////////////////////////////////////////
 // Interpretations
 
@@ -112,7 +112,7 @@ export class Conjunction {
 // A Literal represents a relation that is intended to hold among some objects.
 export class Literal {
     constructor(
-        public relation: string,         // The name of the relation in question
+        public relation: Relation,         // The name of the relation in question
         public args: string[],           // The arguments to the relation
         public polarity: boolean = true, // Whether the literal is positive (true) or negative (false)
     ) {}
