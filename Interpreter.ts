@@ -1,4 +1,3 @@
-
 import {IDictionaryPair} from "./lib/typescript-collections/src/lib/Dictionary";
 import {WorldState} from "./World";
 
@@ -6,11 +5,13 @@ import {
     Command,
     Conjunction, DNFFormula, DropCommand, Entity,
     Literal, Location,
-    MoveCommand, Object, RelativeObject,
+    MoveCommand, Object, Relation, RelativeObject,
     ShrdliteResult, SimpleObject, TakeCommand,
 } from "./Types";
 
 import * as util from "./lib/typescript-collections/src/lib/util";
+import {listenerCount} from "cluster";
+import {forEach} from "./lib/typescript-collections/src/lib/arrays";
 
 /*
  * Interpreter
@@ -54,7 +55,7 @@ export function interpret(parses: ShrdliteResult[], world: WorldState): Shrdlite
     const interpreter: Interpreter = new Interpreter(world);
 
     for (const result of parses) {
-      console.log(result);
+        console.log(result);
         try {
             const intp: DNFFormula = interpreter.interpretCommand(result.parse);
             result.interpretation = intp;
@@ -76,26 +77,26 @@ export function interpret(parses: ShrdliteResult[], world: WorldState): Shrdlite
  * It can read the outputs of the grammar parser and convert them into DNFs for the planner.
  */
 class Interpreter {
-    constructor(
-        private world: WorldState,
+    constructor(private world: WorldState,) {
+    }
 
-    ) {}
+    /**
+     * Floor of world
+     */
+    private floor = new SimpleObject("floor", null, null);
+
     /**
      * The main interpretation method.
      * Note that you should not change the API (type) of this method, only its body.
      * This method should call the mutually recursive methods
      * 'interpretEntity', 'interpretLocation' and 'interpretObject'
-     * TODO rewrite and respect world rules (see docs/rules.md)
      * @param cmd: An object of type 'Command'.
      * @returns: A DNFFormula representing the interpretation of the user's command.
      *           If there's an interpretation error, it throws an error with a string description.
      */
     public interpretCommand(cmd: Command): DNFFormula {
-        // This currently returns a dummy interpretation involving one or two random objects in the world.
-        // Instead it should call the other interpretation methods for
-        // each of its arguments (cmd.entity and/or cmd.location).
-        let interpretation: DNFFormula;
-        let locations: LocationSemantics[]
+        // Todo add function that checks rules on literal
+        // Todo check rules
 
         const all_objects: string[] = Array.prototype.concat.apply([], this.world.stacks);
         if (this.world.holding) {
@@ -103,86 +104,116 @@ class Interpreter {
         }
 
         if (cmd instanceof MoveCommand) {
-            const a = this.interpretEntity(cmd.entity);
-            const b = this.interpretLocation(cmd.location);
+            const entity = this.interpretEntity(cmd.entity);
+            const location = this.interpretLocation(cmd.location);
 
-            if(a.objects.length === 0 || b.entity.objects.length === 0 ) {
-                throw new Error("One of the forms that was entered does not exist in the current world");
-            }
-            if (a.objects === b.entity.objects) {
-                throw new Error("Cannot put an object ontop of itself");
-            }
-            if (a.objects[0].form === "ball" && (b.entity.objects[0].form !== "box" && b.entity.objects[0].form !== "floor")) {
-                throw new Error("Cannot put a ball on a " + b.entity.objects[0].form);
-            }
-            if ((b.entity.objects[0].form === "box" && b.relation !== "inside") || (b.entity.objects[0].form !== "box" && b.relation === "inside") ) {
-                throw new Error("Tried putting something ontop/inside of a " + b.entity.objects[0].form);
-            }
-
-            if(!this.checkLarge(b.entity.objects)) {
-                if(!this.checkSmall(a.objects)) {
-                    throw new Error("Small objects cannot support large objects");
-                }
-            }
-
-            if (b.relation === "inside" && b.entity.objects[0].form === "box" && ["pyramid", "plank", "box"].indexOf(a.objects[0].form)+1) {
-              if(!this.checkLarge(b.entity.objects)) {
-                  throw new Error("Cannot store a " + a.objects[0].form + " in a small box");
-              }
-
-              if(!this.checkSmall(a.objects)) {
-                  throw new Error("There are no small pyramids, planks or boxes so we cannot store them in a box");
-              }
-              //If there are large boxes and small pyramids, planks or boxes, remove small boxes and large objects from respective arrays.
-              b.entity.objects.slice().reverse().forEach((removeSmall, index, object) => {if(removeSmall.size === "small") { b.entity.objects.splice(object.length - 1 - index,1); }});
-              a.objects.slice().reverse().forEach((removeLarge, index, object) => {if(removeLarge.size === "large") { a.objects.splice(object.length - 1 -index,1); } });
-          }
-
-          if (a.objects[0].form === "box" && ["pyramid", "brick"].indexOf(b.entity.objects[0].form)+1) {
-            if(this.checkSmall(a.objects)) {
-                if(this.checkLarge(b.entity.objects)) {
-                    a.objects.slice().reverse().forEach((removeLarge, index, object) => {if(removeLarge.size === "large") { a.objects.splice(object.length - 1 -index,1); } });
-                    b.entity.objects.slice().reverse().forEach((removeSmall, index, object) => {if(removeSmall.size === "small") { b.entity.objects.splice(object.length - 1 - index,1); }});
+            if (location.entity.junction === Junction.Conjunction) {
+                if (entity.junction === Junction.Conjunction) {
+                    // all objects && all locations => 1 big conjunction of all combinations 1 term
+                    const conjunction: Literal[] = [];
+                    for (const object of entity.objects) {
+                        for (const constraint of location.entity.objects) {
+                            const args = [this.getObjectName(object), this.getObjectName(constraint)];
+                            conjunction.push(new Literal(location.relation, args));
+                        }
+                    }
+                    return new DNFFormula([new Conjunction(conjunction)]);
                 } else {
-                    throw new Error("Cannot put a box ontop of a small " + b.entity.objects[0].form);
+                    // any objects && all locations
+                    // (o1c1 o1c2 o1c3) or (o2c1 o2c2 o2c3) or (o3c1 o3c2 o3c3) n terms
+                    const disjunction: Conjunction[] = [];
+                    for (const constraint of location.entity.objects) {
+                        const conjunction: Literal[] = [];
+                        for (const object of entity.objects) {
+                            const args = [this.getObjectName(object), this.getObjectName(constraint)];
+                            conjunction.push(new Literal(location.relation, args));
+                        }
+                        disjunction.push(new Conjunction(conjunction));
+                    }
+                    return new DNFFormula(disjunction);
+                }
+            } else {
+                if (entity.junction === Junction.Conjunction) {
+                    // all objects && any locations => Disjunction(Conjunction(allobjects))
+                    // (o1c1 o2c1 o3c1) or (01c1 o2c1 o3c2) .... exponential growth 2^n terms
+                    const counter: number[] = new Array(entity.objects.length);
+                    for (let i = 0; i < entity.objects.length; ++i) {
+                        counter[i] = 0;
+                    }
+
+                    const totalCount = location.entity.objects.length ** entity.objects.length;
+                    // Iterate over individual conjunctions
+                    const disjunction: Conjunction[] = [];
+                    for (let i = 0; i < totalCount; ++i) {
+                        const conjunction: Literal[] = [];
+                        for (let j = 0; j < entity.objects.length; ++j) {
+                            const args = [this.getObjectName(entity.objects[j]),
+                                this.getObjectName(location.entity.objects[counter[j]])];
+                            conjunction.push(new Literal(location.relation, args));
+                        }
+                        disjunction.push(new Conjunction(conjunction));
+
+                        // Increment counter (base of constraint count)
+                        for (let j = entity.objects.length - 1; j > 0; --j) {
+                            counter[j]++;
+                            if (counter[j] < location.entity.objects.length) {
+                                break;
+                            }
+                            counter[j] = 0;
+                        }
+                    }
+                    return new DNFFormula(disjunction);
+                } else {
+                    // any objects && any locations
+                    // (o1c1) or (o1c2) or (o1c3) or (o2)... or (o3)... n² terms
+                    const disjunction: Conjunction[] = [];
+                    for (const object of entity.objects) {
+                        for (const constraint of location.entity.objects) {
+                            const args = [this.getObjectName(object), this.getObjectName(constraint)];
+                            disjunction.push(new Conjunction([new Literal(location.relation, args)]));
+                        }
+                    }
+                    return new DNFFormula(disjunction);
                 }
             }
-          }
-
-            interpretation = new DNFFormula([
-                new Conjunction([ // ontop(a, b) & ontop(b, floor)
-                    new Literal(b.relation, [this.getObjectName(a.objects[0]), this.getObjectName(b.entity.objects[0])]),
-                ]),
-            ]);
         } else if (cmd instanceof TakeCommand) {
-            const a = all_objects[Math.floor(Math.random() * all_objects.length)];
-            if(!this.world.holding){
+            const entity = this.interpretEntity(cmd.entity);
+            if (!this.world.holding) {
                 throw new Error("I'm already holding something");
             }
-            interpretation = new DNFFormula([
-                new Conjunction([ // holding(a)
-                    new Literal("holding", [a]),
+
+            return new DNFFormula([
+                new Conjunction([
+                    // holding(a)
+                    new Literal("holding", [this.getObjectName(entity)]),
                 ]),
             ]);
         } else if (cmd instanceof DropCommand) {
             if (!this.world.holding) {
                 throw new Error("I'm not holding anything");
             }
-            const a = this.world.holding;
-            const b = all_objects[Math.floor(Math.random() * all_objects.length)];
-            if (a === b) {
-                throw new Error("Cannot put an object ontop of itself");
-            }
-            interpretation = new DNFFormula([
-                new Conjunction([ // ontop(a, b)
-                    new Literal("ontop", [a, b]),
-                ]),
-            ]);
-        } else {
-            throw new Error("Unknown command");
-        }
+            const location = this.interpretLocation(cmd.location);
 
-        return interpretation;
+            // todo rule: check inside box vs ontop of other stuff
+            if (location.entity.junction === Junction.Conjunction) {
+                // One big conjunction term with all constraints
+                const conjunction: Literal[] = [];
+                for (const constraint of location.entity.objects) {
+                    const args = [this.world.holding, this.getObjectName(constraint)];
+                    conjunction.push(new Literal(cmd.location.relation, args));
+                }
+                return new DNFFormula([new Conjunction(conjunction)]);
+            } else {
+                // One conjunction term per constraint
+                const disjunction: Conjunction[] = [];
+                for (const constraint of location.entity.objects) {
+                    const args = [this.world.holding, this.getObjectName(constraint)];
+                    disjunction.push(new Conjunction([new Literal(cmd.location.relation, args)]));
+                }
+                return new DNFFormula(disjunction);
+            }
+        }
+        throw new Error("Unknown command");
     }
 
     /**
@@ -208,41 +239,13 @@ class Interpreter {
     }
 
     /**
-     * Resolve ambiguities between different simple objects
-     * @param {SimpleObject[]} objects: Possible objects
-     * @returns {SimpleObject} The object desired by the user
-     */
-    public resolveAmbiguity(objects: SimpleObject[]): SimpleObject {
-        // TODO implement as extension (see docs/extensions.md)
-        return objects[0];
-    }
-
-    /**
      * Interpret a location consisting of a relation to an entity
      * @param {Location} location: The location as parsed by the grammar
      * @returns {LocationSemantics} The location to build a DNF from
      */
     public interpretLocation(location: Location): LocationSemantics {
         const entity = this.interpretEntity(location.entity);
-        // TODO check rules for relation (see docs/rules.md)
-        switch (location.relation) {
-            case "leftof":
-                return{relation: "leftof", entity: entity}
-            case "rightof":
-                return{relation: "rightof", entity: entity}
-            case "beside":
-                return{relation: "beside", entity: entity}
-            case "inside":
-                return{relation: "inside", entity: entity}
-            case "ontop":
-                return{relation: "ontop", entity: entity}
-            case "under":
-                return{relation: "under", entity: entity}
-            case "above":
-                return{relation: "above", entity: entity}
-            default:
-                throw new Error(`Unknown relation: ${location.relation}`);
-        }
+        return {relation: location.relation, entity};
     }
 
     /**
@@ -254,42 +257,55 @@ class Interpreter {
         if (filterObject instanceof SimpleObject) {
             let result = this.getSimpleObjects();
             if (filterObject.form !== "anyform") {
-              result = result.filter((simpleObj) => simpleObj.form === filterObject.form);
+                result = result.filter((simpleObj) => simpleObj.form === filterObject.form);
             }
             if (filterObject.color !== null) {
-               result = result.filter((simpleObj) => simpleObj.color === filterObject.color);
+                result = result.filter((simpleObj) => simpleObj.color === filterObject.color);
             }
             if (filterObject.size !== null) {
-               result = result.filter((simpleObj) => simpleObj.size === filterObject.size);
+                result = result.filter((simpleObj) => simpleObj.size === filterObject.size);
             }
             return result;
         } else {
-              let result = this.getObjectsOfRelative(filterObject.object);
-              //locations = this.interpretLocation(filterObject.location);
-              return result;
+            const result = this.getObjects(filterObject.object);
+            const location = this.interpretLocation(filterObject.location);
+            return this.filterObjectsByLocation(result, location);
         }
     }
 
-    private getObjectsOfRelative(filterObject: Object): SimpleObject[] {
-        let array: SimpleObject[] = [];
-        if(filterObject instanceof SimpleObject) {
-          let array = this.getSimpleObjects()
-          if (filterObject.form !== "anyform") {
-            array = array.filter((simpleObj) => simpleObj.form === filterObject.form);
-          }
-          if (filterObject.color !== null) {
-             array = array.filter((simpleObj) => simpleObj.color === filterObject.color);
-          }
-          if (filterObject.size !== null) {
-             array = array.filter((simpleObj) => simpleObj.size === filterObject.size);
-          }
-          return array;
-        } else {
-          array = this.getObjectsOfRelative(filterObject.object);
+    /**
+     * Resolve ambiguities between different simple objects
+     * @param {SimpleObject[]} objects: Possible objects
+     * @returns {SimpleObject} The object desired by the user
+     */
+    private resolveAmbiguity(objects: SimpleObject[]): SimpleObject {
+        // TODO implement as extension (see docs/extensions.md)
+        return objects[0];
+    }
 
-          return array;
+    /**
+     * Checks if a literal complies with rules
+     * @param {Literal} literal: The literal to check
+     * @returns {boolean} True if literal is allowed by rules, false otherwise
+     */
+    private validateLiteral(literal: Literal): boolean {
+        switch (literal.relation) {
+            case "leftof":
+                break;
+            case "rightof":
+                break;
+            case "inside":
+                break;
+            case "ontop":
+                break;
+            case "under":
+                break;
+            case "beside":
+                break;
+            case "above":
+                break;
         }
-
+        throw new Error(`Unknown relatio: ${literal.relation}`);
     }
 
     /**
@@ -303,7 +319,84 @@ class Interpreter {
                 array.push(this.world.objects[name]);
             }
         }
+        array.push(this.floor);
         return array;
+    }
+
+    /**
+     * Dictionary of functions that say if objectA is in a specific relation to objectB
+     */
+    private relationTesters: { [relation: string]: RelationTesterFunction; } = {
+        leftof: (objectA, stackA, objectB, stackB) => stackA === stackB - 1,
+        rightof: (objectA, stackA, objectB, stackB) => stackA - 1 === stackB,
+        beside: (objectA, stackA, objectB, stackB) => stackA - 1 === stackB || stackA === stackB - 1,
+        inside: (objectA, stackA, objectB, stackB) =>
+            stackA === stackB
+            && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) - 1
+            === this.world.stacks[stackA].indexOf(this.getObjectName(objectB))
+            && objectB.form === "box",
+        ontop: (objectA, stackA, objectB, stackB) =>
+            stackA === stackB
+            && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) - 1
+            === this.world.stacks[stackA].indexOf(this.getObjectName(objectB))
+            && objectB.form !== "box",
+        under: (objectA, stackA, objectB, stackB) =>
+            stackA === stackB
+            && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) <
+            this.world.stacks[stackA].indexOf(this.getObjectName(objectB)),
+        above: (objectA, stackA, objectB, stackB) =>
+            stackA === stackB
+            && this.world.stacks[stackA].indexOf(this.getObjectName(objectA)) >
+            this.world.stacks[stackA].indexOf(this.getObjectName(objectB)),
+    };
+
+    /**
+     * Interpret a location consisting of a relation to an entity
+     * @param {SimpleObject[]} objects: Objects to filter by location
+     * @param {Location} filterLocation: The location as parsed by the grammar
+     * @returns {LocationSemantics} The objects that are in the described location
+     */
+    private filterObjectsByLocation(objects: SimpleObject[], filterLocation: LocationSemantics): SimpleObject[] {
+        const result: SimpleObject[] = [];
+
+        for (const object of objects) {
+            const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
+                const stackA = this.getStackId(objectA);
+                const stackB = this.getStackId(objectB);
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                return this.relationTesters[filterLocation.relation](objectA, stackA, objectB, stackB);
+            };
+            const isInRelation = filterLocation.entity.junction === Junction.Conjunction
+                ? filterLocation.entity.objects.every((locationObject) => relationTester(object, locationObject))
+                : filterLocation.entity.objects.some((locationObject) => relationTester(object, locationObject));
+            if (isInRelation) {
+                result.push(object);
+            }
+        }
+
+        return result;
+    }
+
+    private checkLarge(objs: SimpleObject[]): boolean {
+        let hasLarge: boolean = false;
+        objs.forEach((testLength) => {
+            if (testLength.size === "large") {
+                hasLarge = true;
+            }
+        });
+        return hasLarge;
+    }
+
+    private checkSmall(objs: SimpleObject[]): boolean {
+        let hasSmall: boolean = false;
+        objs.forEach((testSmall) => {
+            if (testSmall.size === "small") {
+                hasSmall = true;
+            }
+        });
+        return hasSmall;
     }
 
     /**
@@ -312,6 +405,9 @@ class Interpreter {
      * @returns {string} The name given to the object in the world
      */
     private getObjectName(obj: SimpleObject): string {
+        if (obj === this.floor) {
+            return "floor";
+        }
         for (const name in this.world.objects) {
             if (util.has(this.world.objects, name)) {
                 if (this.world.objects[name] === obj) {
@@ -322,25 +418,48 @@ class Interpreter {
         throw new Error("Could not find object");
     }
 
-    private checkLarge(objs: SimpleObject[]): boolean {
-        let hasLarge: boolean = false;
-        objs.forEach((testLength) => {if(testLength.size === "large") {hasLarge = true}});
-        return hasLarge;
+    /**
+     * Lookup an objects by its name in the world
+     * @param {SimpleObject} name: The name of the object to look up
+     * @returns {string} The object matching the name
+     */
+    private getObject(name: string): SimpleObject {
+        if (name === "floor") {
+            return this.floor;
+        }
+        return this.world.objects[name];
     }
 
-    private checkSmall(objs: SimpleObject[]): boolean {
-        let hasSmall: boolean = false;
-        objs.forEach((testSmall) => {if(testSmall.size === "small") {hasSmall = true}});
-        return hasSmall;
-    }
+    /**
+     * Get number of stack containing object
+     * @param {SimpleObject} object: Object to get stack for
+     * @returns {number | undefined} The identifier of the stack containing object
+     * or undefined if no stack contains object
+     */
+    private getStackId(object: SimpleObject): number | undefined {
+        const stacks = this.world.stacks
+            .filter((stack) => stack.some((obj) => this.getObject(obj) === object));
 
+        if (stacks.length === 0) {
+            return undefined;
+        }
+        return this.world.stacks.indexOf(stacks[0]);
+    }
 }
 
 // Type of junction for building the DNF
 enum Junction { Disjunction, Conjunction}
 
 // Semantics of an entity, describing all objects they (might) refer to
-interface EntitySemantics   {junction: Junction; objects: SimpleObject[]; }
+interface EntitySemantics {
+    junction: Junction;
+    objects: SimpleObject[];
+}
 
 // Semantics of a location, contains a relation to an entity
-interface LocationSemantics {relation: string; entity: EntitySemantics; }
+interface LocationSemantics {
+    relation: Relation;
+    entity: EntitySemantics;
+}
+
+type RelationTesterFunction = (objectA: SimpleObject, stackA: number, objectB: SimpleObject, stackB: number) => boolean;
