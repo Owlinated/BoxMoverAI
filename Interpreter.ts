@@ -462,7 +462,7 @@ class Interpreter {
                     || (stackB === undefined && objectB !== this.floor)) {
                     return false;
                 }
-                return this.relationTesters[filterLocation.relation](objectA, stackA, objectB, stackB);
+                return this.relationTesters[filterLocation.relation](objectA, <number>stackA, objectB, <number>stackB);
             };
             const isInRelation = filterLocation.entity.junction === Junction.Conjunction
                 ? filterLocation.entity.objects.every((locationObject) => relationTester(object, locationObject))
