@@ -1,19 +1,20 @@
 
-/*
- * InterpreterTestCases
- *
- * This file contains several test cases, some of which have not been authored yet.
- * You should add your own interpretation where it says so.
- * You are also free to add new test cases.
- */
+/********************************************************************************
+** InterpreterTestCases
+
+This file contains several test cases, some of which have not been authored yet.
+You should add your own interpretation where it says so.
+You are also free to add new test cases.
+********************************************************************************/
 
 export interface TestCase {
-    world: string;
-    utterance: string;
-    interpretations: string[][];
+    world : string;
+    utterance : string;
+    interpretations : string[]
 }
 
-export let testCases: TestCase[] = [];
+export var testCases : TestCase[] = [];
+
 
 //////////////////////////////////////////////////////////////////////
 // Examples that test the physical laws
@@ -45,7 +46,7 @@ testCases.push({
 testCases.push({
     world: "medium",
     utterance: "put a plank in a box",
-    interpretations: [["inside(SmlGrnPlnk,LrgRedBox)", "inside(SmlGrnPlnk,LrgYlwBox)"]]
+    interpretations: ["inside(SmlGrnPlnk,LrgYlwBox) | inside(SmlGrnPlnk,LrgRedBox)"]
 });
 
 testCases.push({
@@ -57,7 +58,7 @@ testCases.push({
 testCases.push({
     world: "medium",
     utterance: "put a pyramid in a box",
-    interpretations: [["inside(SmlRedPrmd,LrgRedBox)", "inside(SmlRedPrmd,LrgYlwBox)"]]
+    interpretations: ["inside(SmlRedPrmd,LrgYlwBox) | inside(SmlRedPrmd,LrgRedBox)"]
 });
 
 testCases.push({
@@ -69,7 +70,7 @@ testCases.push({
 testCases.push({
     world: "medium",
     utterance: "put a box in a box",
-    interpretations: [["inside(SmlBluBox,LrgRedBox)", "inside(SmlBluBox,LrgYlwBox)"]]
+    interpretations: ["inside(SmlBluBox,LrgYlwBox) | inside(SmlBluBox,LrgRedBox)"]
 });
 
 testCases.push({
@@ -95,9 +96,9 @@ testCases.push({
 testCases.push({
     world: "medium",
     utterance: "put a large box on a large brick",
-    interpretations: [["ontop(LrgRedBox,LrgGrnBrck1)", "ontop(LrgYlwBox,LrgGrnBrck1)",
-                       "ontop(LrgRedBox,LrgGrnBrck2)", "ontop(LrgYlwBox,LrgGrnBrck2)",
-                       "ontop(LrgRedBox,LrgGrnBrck3)", "ontop(LrgYlwBox,LrgGrnBrck3)"]]
+    interpretations: ["ontop(LrgYlwBox,LrgGrnBrck1) | ontop(LrgYlwBox,LrgGrnBrck2)  | " +
+                      "ontop(LrgYlwBox,LrgGrnBrck3) | ontop(LrgRedBox,LrgGrnBrck1) |" +
+                      "ontop(LrgRedBox,LrgGrnBrck2) | ontop(LrgRedBox,LrgGrnBrck3) "]
 });
 
 testCases.push({
@@ -158,71 +159,77 @@ testCases.push({
     interpretations: []
 });
 
+
 //////////////////////////////////////////////////////////////////////
 // Simple examples with a clear interpretation
 
 testCases.push({
     world: "small",
     utterance: "take an object",
-    interpretations: [["holding(LargeBlueTable)", "holding(LargeWhiteBall)", "holding(LargeRedBox)",
-        "holding(LargeYellowBox)", "holding(SmallBlackBall)", "holding(SmallBlueBox)"]]
+    interpretations: ["holding(LargeWhiteBall)|holding(SmallBlackBall)|holding(LargeBlueTable)|" +
+                      "holding(LargeYellowBox)|holding(LargeRedBox)|holding(SmallBlueBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "take a blue object",
-    interpretations: [["holding(LargeBlueTable)", "holding(SmallBlueBox)"]]
+    interpretations: ["holding(LargeBlueTable)  |  holding(SmallBlueBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "take a box",
-    interpretations: [["holding(LargeRedBox)", "holding(LargeYellowBox)", "holding(SmallBlueBox)"]]
+    interpretations: ["holding(LargeYellowBox) | holding(LargeRedBox) | holding(SmallBlueBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a ball in a box",
-    interpretations: [["inside(LargeWhiteBall,LargeRedBox)", "inside(LargeWhiteBall,LargeYellowBox)",
-        "inside(SmallBlackBall,LargeRedBox)", "inside(SmallBlackBall,LargeYellowBox)",
-        "inside(SmallBlackBall,SmallBlueBox)"]]
+    interpretations: ["inside(LargeWhiteBall,LargeYellowBox) | inside(LargeWhiteBall,LargeRedBox) |" +
+                      "inside(SmallBlackBall,LargeYellowBox) | inside(SmallBlackBall,LargeRedBox) |" +
+                      "inside(SmallBlackBall,SmallBlueBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a ball above a table",
-    interpretations: [["above(LargeWhiteBall,LargeBlueTable)", "above(SmallBlackBall,LargeBlueTable)"]]
+    interpretations: ["above(LargeWhiteBall,LargeBlueTable)|above(SmallBlackBall,LargeBlueTable)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a ball left of a ball",
-    interpretations: [["leftof(LargeWhiteBall,SmallBlackBall)", "leftof(SmallBlackBall,LargeWhiteBall)"]]
+    interpretations: ["leftof(LargeWhiteBall,SmallBlackBall) | leftof(SmallBlackBall,LargeWhiteBall)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "take a white object beside a blue object",
-    interpretations: [["holding(LargeWhiteBall)"]]
+    interpretations: ["holding(LargeWhiteBall)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a white object beside a blue object",
-    interpretations: [["beside(LargeWhiteBall,LargeBlueTable)", "beside(LargeWhiteBall,SmallBlueBox)"]]
+    interpretations: ["beside(LargeWhiteBall,LargeBlueTable) | beside(LargeWhiteBall,SmallBlueBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a white ball in a box on the floor",
-    interpretations: [["inside(LargeWhiteBall,LargeYellowBox)"]]
+    interpretations: ["inside(LargeWhiteBall,LargeYellowBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a black ball in a box on the floor",
-    interpretations: [["inside(SmallBlackBall,LargeYellowBox)"], ["ontop(SmallBlackBall,floor)"]]
+    interpretations: ["inside(SmallBlackBall,LargeYellowBox)",
+                      //// Perhaps you want the following interpretation too?
+                      // "inside(SmallBlackBall,SmallBlueBox) & ontop(SmallBlueBox,floor)",
+                      // "inside(SmallBlackBall,LargeRedBox) & ontop(LargeRedBox,floor)",
+                      "ontop(SmallBlackBall,floor)"]
 });
+
 
 //////////////////////////////////////////////////////////////////////
 // Examples where YOU shuold define the interpretation
@@ -230,7 +237,8 @@ testCases.push({
 testCases.push({
     world: "small",
     utterance: "put a ball in a box on the floor",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["inside(LargeWhiteBall,LargeYellowBox) | inside(SmallBlackBall,LargeYellowBox)",
+                      "ontop(SmallBlackBall,floor)"]
 });
 
 // "put it"
@@ -238,7 +246,7 @@ testCases.push({
 testCases.push({
     world: "medium",
     utterance: "put it on the floor",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["ontop(LrgGrnBrck1,floor)"]
 });
 
 // Deep recursion
@@ -246,38 +254,45 @@ testCases.push({
 testCases.push({
     world: "small",
     utterance: "take a ball in a box in a box",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["holding(SmallBlackBall)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "take a ball in a box in a box on the floor",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["holding(SmallBlackBall)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a box on a table on the floor",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["ontop(LargeRedBox,floor)",
+                      "ontop(LargeYellowBox,LargeBlueTable) | ontop(LargeRedBox,LargeBlueTable) |" +
+                      "ontop(SmallBlueBox,LargeBlueTable)"
+                     ]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a box in a box on a table",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["inside(SmallBlueBox,LargeRedBox)",
+                      "ontop(SmallBlueBox,LargeBlueTable)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a box in a box on a table on the floor",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["inside(SmallBlueBox,LargeRedBox)",
+                      "ontop(SmallBlueBox,LargeBlueTable)"]
 });
 
 testCases.push({
     world: "medium",
     utterance: "put a brick on a brick on a brick on the floor",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["ontop(SmlWhtBrck, LrgGrnBrck2)",
+                      "ontop(SmlWhtBrck, floor)"]
 });
+
 
 //////////////////////////////////////////////////////////////////////
 // Test cases for the ALL quantifier
@@ -286,41 +301,72 @@ testCases.push({
 testCases.push({
     world: "small",
     utterance: "put all balls on the floor",
-    interpretations: [["ontop(LargeWhiteBall,floor) & ontop(SmallBlackBall,floor)"]]
+    interpretations: ["ontop(LargeWhiteBall,floor) & ontop(SmallBlackBall,floor)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put every ball to the right of all blue things",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["rightof(LargeWhiteBall,LargeBlueTable) & rightof(LargeWhiteBall,SmallBlueBox)"+
+                      " & rightof(SmallBlackBall,LargeBlueTable) & rightof(SmallBlackBall,SmallBlueBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put all balls left of a box on the floor",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    //might be wrong
+    interpretations: ["leftof(LargeWhiteBall,LargeYellowBox) & leftof(SmallBlackBall,LargeYellowBox)",
+                      "ontop(LargeWhiteBall,floor)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put a ball in every large box",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    //This interprets wrongly
+    interpretations: ["inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,LargeYellowBox) |" +
+                      "inside(LargeWhiteBall,LargeRedBox) & inside(SmallBlackBall,LargeRedBox)"]
 });
 
 testCases.push({
     world: "small",
     utterance: "put every ball in a box",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    //wrong interpretation?
+    interpretations: ["inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,LargeYellowBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,LargeRedBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,SmallBlueBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,LargeYellowBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,LargeRedBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,SmallBlueBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,LargeYellowBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,LargeRedBox) |" +
+                      "inside(LargeWhiteBall,LargeYellowBox) & inside(SmallBlackBall,SmallBlueBox)"]
 });
 
 testCases.push({
     world: "medium",
     utterance: "put all large green bricks beside a large green brick",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["beside(LrgGrnBrck2,LrgGrnBrck1) & beside(LrgGrnBrck3,LrgGrnBrck1) |" +
+                      "beside(LrgGrnBrck2,LrgGrnBrck1) & beside(LrgGrnBrck3,LrgGrnBrck2) | beside(LrgGrnBrck2,LrgGrnBrck1) |" +
+                      "beside(LrgGrnBrck3,LrgGrnBrck1) | beside(LrgGrnBrck3,LrgGrnBrck2) | beside(LrgGrnBrck2,LrgGrnBrck3) &" +
+                      "beside(LrgGrnBrck3,LrgGrnBrck1) | beside(LrgGrnBrck2,LrgGrnBrck3) & beside(LrgGrnBrck3,LrgGrnBrck2) |" +
+                      "beside(LrgGrnBrck2,LrgGrnBrck3) | beside(LrgGrnBrck2,LrgGrnBrck1) & beside(LrgGrnBrck3,LrgGrnBrck1) |" +
+                      "beside(LrgGrnBrck2,LrgGrnBrck1) & beside(LrgGrnBrck3,LrgGrnBrck2) | beside(LrgGrnBrck2,LrgGrnBrck1) |" +
+                      "beside(LrgGrnBrck3,LrgGrnBrck1) | beside(LrgGrnBrck3,LrgGrnBrck2) | beside(LrgGrnBrck2,LrgGrnBrck3) &" +
+                      "beside(LrgGrnBrck3,LrgGrnBrck1) | beside(LrgGrnBrck2,LrgGrnBrck3) & beside(LrgGrnBrck3,LrgGrnBrck2) |" +
+                      "beside(LrgGrnBrck2,LrgGrnBrck3) | beside(LrgGrnBrck2,LrgGrnBrck1) & beside(LrgGrnBrck3,LrgGrnBrck1) |" +
+                      "beside(LrgGrnBrck2,LrgGrnBrck1) & beside(LrgGrnBrck3,LrgGrnBrck2) | beside(LrgGrnBrck2,LrgGrnBrck1) |" +
+                      "beside(LrgGrnBrck3,LrgGrnBrck1) | beside(LrgGrnBrck3,LrgGrnBrck2) | beside(LrgGrnBrck2,LrgGrnBrck3) &" +
+                      "beside(LrgGrnBrck3,LrgGrnBrck1) | beside(LrgGrnBrck2,LrgGrnBrck3) & beside(LrgGrnBrck3,LrgGrnBrck2) |" +
+                      "beside(LrgGrnBrck2,LrgGrnBrck3)"]
 });
 
 testCases.push({
     world: "medium",
     utterance: "put all green objects left of all red objects",
-    interpretations: [["COME UP WITH YOUR OWN INTERPRETATION"]]
+    interpretations: ["leftof(LrgGrnBrck1,LrgRedPlnk) & leftof(LrgGrnBrck1,SmlRedTble) & leftof(LrgGrnBrck1,SmlRedPrmd) &" +
+                      "leftof(LrgGrnBrck1,LrgRedBox) & leftof(LrgGrnBrck2,LrgRedPlnk) & leftof(LrgGrnBrck2,SmlRedTble) &" +
+                      "leftof(LrgGrnBrck2,SmlRedPrmd) & leftof(LrgGrnBrck2,LrgRedBox) & leftof(LrgGrnBrck3,LrgRedPlnk) &" +
+                      "leftof(LrgGrnBrck3,SmlRedTble) & leftof(LrgGrnBrck3,SmlRedPrmd) & leftof(LrgGrnBrck3,LrgRedBox) &" +
+                      "leftof(SmlGrnPlnk,LrgRedPlnk) & leftof(SmlGrnPlnk,SmlRedTble) & leftof(SmlGrnPlnk,SmlRedPrmd) & " +
+                      "leftof(SmlGrnPlnk,LrgRedBox)"]
 });
