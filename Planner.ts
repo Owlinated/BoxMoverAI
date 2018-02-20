@@ -1,7 +1,8 @@
 
+import {AssertionError} from "assert";
 import {aStarSearch} from "./AStarSearch";
 import {Graph, SearchResult, Successor} from "./Graph";
-import {DNFFormula, Literal, ShrdliteResult} from "./Types";
+import {Conjunction, DNFFormula, Literal, ShrdliteResult} from "./Types";
 import {WorldState} from "./World";
 
 /*
@@ -53,13 +54,6 @@ export function plan(interpretations: ShrdliteResult[], world: WorldState): Shrd
     return plans;
 }
 
-/*
- * The core planner class.
- * The code here are just templates; you should rewrite this class entirely.
- * In this template, the code produces a dummy plan which is not connected
- * to the argument 'interpretation'. Your version of the class should
- * analyse 'interpretation' in order to figure out what plan to return.
- */
 class Planner {
     constructor(
         private world: WorldState,
@@ -76,64 +70,63 @@ class Planner {
      *           If there's a planning error, it throws an error with a string description.
      */
     public makePlan(interpretation: DNFFormula): string[] {
-        // This currently returns a dummy plan which picks up a random object
-        // and moves it around before dropping it down.
         const state = this.world;
-        const plan: string[] = [];
-
-        // Select a random nonempty stack
-        let pickstack: number;
-        do {
-            pickstack = Math.floor(Math.random() * state.stacks.length);
-        } while (state.stacks[pickstack].length === 0);
-
-        // First move the arm to the selected stack
-        if (pickstack < state.arm) {
-            plan.push("Moving left to stack " + pickstack);
-            for (let i = state.arm; i > pickstack; i--) {
-                plan.push("l");
-            }
-        } else if (pickstack > state.arm) {
-            plan.push("Moving right to stack " + pickstack);
-            for (let i = state.arm; i < pickstack; i++) {
-                plan.push("r");
-            }
-        }
-
-        // Then pick up the topmost object in the selected stack
-        const obj = state.stacks[pickstack][state.stacks[pickstack].length - 1];
-        plan.push("Picking up the " + state.objects[obj].form,
-                  "p");
-
-        if (pickstack > 0) {
-            // Then move the arm to the leftmost stack
-            plan.push("Moving as far left as possible");
-            for (let i = pickstack; i > 0; i--) {
-                plan.push("l");
-            }
-        }
-
-        // Select a random destination stack (either empty or the original pickup stack)
-        let dropstack: number;
-        do {
-            dropstack = Math.floor(Math.random() * state.stacks.length);
-        } while (!(state.stacks[dropstack].length === 0 || dropstack === pickstack));
-
-        if (dropstack > 0) {
-            // Then move the arm to the destination stack
-            plan.push("Moving right to the destination stack " + dropstack);
-            for (let i = 0; i < dropstack; i++) {
-                plan.push("r");
-            }
-        }
-
-        // Finally put the object down again
-        plan.push("Dropping the " + state.objects[obj].form,
-                  "d");
-
-        return plan;
+        const startNode = new ShrdliteNode(this.world.stacks, this.world.holding, this.world.arm, undefined);
+        const goalTest = (node: ShrdliteNode) => this.checkGoal(node, interpretation);
+        const path = aStarSearch(new ShrdliteGraph(), startNode, goalTest, this.getHeuristic, 60);
+        const result =  path.path.map((node) => node.action);
+        return result;
     }
 
+    private checkGoal(node: ShrdliteNode, interpretation: DNFFormula) {
+        for (const conjunciton of interpretation.conjuncts) {
+            if (this.checkConjunction(node, conjunciton)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private checkConjunction(node: ShrdliteNode, conjunction: Conjunction) {
+        for (const literal of conjunction.literals) {
+            if (literal.relation === "holding") {
+                if (literal.args.length !== 1) {
+                    throw new Error("Literal needs exactly one argument");
+                }
+                if (literal.args[0] !== node.holding) {
+                    return false;
+                }
+                continue;
+            }
+
+            if (literal.args.length !== 2) {
+                throw new Error("Literal needs exactly two arguments");
+            }
+            switch (literal.relation) {
+                case "leftof":
+                    return true;
+                case "rightof":
+                    return true;
+                case "inside":
+                    return true;
+                case "ontop":
+                    return true;
+                case "under":
+                    return true;
+                case "beside":
+                    return true;
+                case "above":
+                    return true;
+                default:
+                    throw new Error(`Unknown relatio: ${literal.relation}`);
+            }
+        }
+        return true;
+    }
+
+    private getHeuristic(node: ShrdliteNode) {
+        return 0;
+    }
 }
 
 /*
@@ -143,27 +136,73 @@ class ShrdliteNode {
     // These are for making the nodes possible to compare efficiently:
     public id: string;
 
-    // TODO Possibly some additional private fields or methods:
-    private private_field: string;
+    // Changing properties of the world:
+    // Where the objects are located in the world.
+    public stacks: string[][];
+    // Which object the robot is currently holding, or null if not holding anything.
+    public holding: string | null;
+    // The column position of the robot arm.
+    public  arm: number;
 
-    constructor(
-        public first_field: number,
-        public second_field: string,
-        public another_field: Literal, // Note: you probably don't want any Literal here...
-    ) {
-        this.id = "TO BE IMPLEMENTED FROM THE FIELDS";
+    constructor(stacks: string[][], holding: string | null, arm: number, action: Action | undefined) {
+        // Copy properties
+        this.stacks = [];
+        for (const stack of stacks) {
+            this.stacks.push(stack.slice());
+        }
+        this.holding = holding;
+        this.arm = arm;
+
+        // Update properties with action
+        if (action !== undefined) {
+            this.updateState(action);
+        }
     }
 
     public toString(): string {
         return this.id;
     }
+
     public compareTo(other: ShrdliteNode) {
         return this.id.localeCompare(other.id);
     }
 
-    // TODO Possibly some additional private fields or methods:
-    private privateMethod(argument: string): number {
-        throw new Error("Not implemented");
+    private updateState(action: Action) {
+        switch (action) {
+            case "l":
+                if (this.arm === 0) {
+                    throw new Error("Cannot move left from leftmost position");
+                }
+                this.arm--;
+            case "r":
+                if (this.arm === this.stacks.length - 1) {
+                    throw new Error("Cannot move right from rightmost position");
+                }
+                this.arm++;
+            case "p":
+                if (this.holding !== null) {
+                    throw new Error("Cannot pick up an item when already holding something");
+                }
+                const stack = this.stacks[this.arm];
+                if (stack.length === 0) {
+                    throw new Error("Cannot pick up from empty stack");
+                }
+                const pickedUp = stack.splice(-1, 1);
+                this.holding = pickedUp[0];
+            case "d":
+                if (this.holding === null) {
+                    throw new Error("Cannot drop an item without holding something");
+                }
+                // TODO rule validation
+                this.stacks[this.arm].push(this.holding);
+                this.holding = null;
+        }
+
+        this.id = "";
+        for (const stack of this.stacks) {
+            this.id += stack.join() + "|";
+        }
+        this.id += this.arm + "|" + this.holding;
     }
 }
 
@@ -171,19 +210,26 @@ class ShrdliteNode {
  * A* search graph, to be implemented and cleaned
  */
 class ShrdliteGraph implements Graph<ShrdliteNode> {
-    // TODO  Possibly some additional private fields:
-    private private_field: string;
-
     public successors(current: ShrdliteNode): Array<Successor<ShrdliteNode>> {
-        throw new Error("Not implemented");
+        const result = [];
+        const actions = ["l", "r", "p", "d"];
+        for (const action of actions) {
+            // todo rewrite without exeptions!
+            try {
+                const node = new ShrdliteNode(current.stacks, current.holding, current.arm, action);
+                // todo change cost
+                const successor: Successor<ShrdliteNode> = {child: node, action, cost: 1}
+                result.push(successor);
+            } catch {
+                // Ignore
+            }
+        }
+        return result;
     }
 
     public compareNodes(a: ShrdliteNode, b: ShrdliteNode): number {
         return a.compareTo(b);
     }
-
-    // TODO Possibly some additional private methods:
-    private privateMethod(argument: string): number {
-        throw new Error("Not implemented");
-    }
 }
+
+type Action = "l" | "r" | "p" | "d" | string;

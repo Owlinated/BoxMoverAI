@@ -391,7 +391,7 @@ class Interpreter {
                 }
                 return true;
             default:
-                throw new Error(`Unknown relatio: ${literal.relation}`);
+                throw new Error(`Unknown relation: ${literal.relation}`);
         }
     }
 
