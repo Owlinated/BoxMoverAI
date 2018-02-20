@@ -1,5 +1,4 @@
 
-import {AssertionError} from "assert";
 import {aStarSearch} from "./AStarSearch";
 import {Graph, SearchResult, Successor} from "./Graph";
 import {Conjunction, DNFFormula, Literal, ShrdliteResult} from "./Types";
@@ -70,98 +69,125 @@ class Planner {
      *           If there's a planning error, it throws an error with a string description.
      */
     public makePlan(interpretation: DNFFormula): string[] {
-        const state = this.world;
         const startNode = new ShrdliteNode(this.world.stacks, this.world.holding, this.world.arm, undefined);
-        const goalTest = (node: ShrdliteNode) => this.checkGoal(node, interpretation);
-        const path = aStarSearch(new ShrdliteGraph(), startNode, goalTest, this.getHeuristic, 60);
-        const result =  path.path.map((node) => node.action);
+        const goalTest = (node: ShrdliteNode) => this.checkGoalDNF(node, interpretation);
+        const heuristic = (node: ShrdliteNode) => this.getHeuristicDNF(node, interpretation);
+        const path = aStarSearch(new ShrdliteGraph(), startNode, goalTest, heuristic, 10);
+        const result = path.path.map((node) => node.action);
         return result;
     }
 
-    private checkGoal(node: ShrdliteNode, interpretation: DNFFormula) {
-        for (const conjunciton of interpretation.conjuncts) {
-            if (this.checkConjunction(node, conjunciton)) {
-                return true;
-            }
-        }
-        return false;
+    private checkGoalDNF(node: ShrdliteNode, interpretation: DNFFormula) {
+        return interpretation.conjuncts.some((conjunction) => this.checkGoalConjunction(node, conjunction));
     }
 
-    private checkConjunction(node: ShrdliteNode, conjunction: Conjunction) {
-        for (const literal of conjunction.literals) {
-            if (literal.relation === "holding") {
-                if (literal.args.length !== 1) {
-                    throw new Error("Literal needs exactly one argument");
-                }
-                if (literal.args[0] !== node.holding) {
+    private checkGoalConjunction(node: ShrdliteNode, conjunction: Conjunction) {
+        return conjunction.literals.every((literal) => this.checkGoalLiteral(node, literal));
+    }
+
+    private checkGoalLiteral(node: ShrdliteNode, literal: Literal) {
+        if (literal.relation === "holding") {
+            if (literal.args.length !== 1) {
+                throw new Error("Literal needs exactly one argument");
+            }
+            return literal.args[0] === node.holding;
+        }
+
+        if (literal.args.length !== 2) {
+            throw new Error("Literal needs exactly two arguments");
+        }
+        const stackA = this.getStackId(literal.args[0], node.stacks);
+        const stackB = this.getStackId(literal.args[1], node.stacks);
+        if (stackA === undefined || stackB === undefined) {
+            return false;
+        }
+
+        const stack = node.stacks[stackA];
+
+        switch (literal.relation) {
+            case "leftof":
+                return stackA < stackB;
+            case "rightof":
+                return stackA > stackB;
+            case "inside":
+            /* falls through */
+            case "ontop":
+                if (stackA !== stackB) {
                     return false;
                 }
-                continue;
-            }
-
-            if (literal.args.length !== 2) {
-                throw new Error("Literal needs exactly two arguments");
-            }
-            const ObjectOne = this.getStackId(literal.args[0]);
-            const ObjectTwo = this.getStackId(literal.args[1]);
-            if(ObjectOne === undefined || ObjectTwo === undefined) {
-                return false;
-            }
-            switch (literal.relation) {
-                case "leftof":
-                    if(ObjectOne >= ObjectTwo ){
-                      return false;
-                    }
-                case "rightof":
-                    if(ObjectOne <= ObjectTwo) {
-                      return false;
-                    }
-                case "inside":
-                /* falls through */
-                case "ontop":
-                    if(ObjectOne !== ObjectTwo) {
-                      return false;
-                    }
-                    if(node.stacks[ObjectOne].indexOf(literal.args[0]) !== node.stacks[ObjectTwo].indexOf(literal.args[1]) + 1) {
-                      return false;
-                    }
-                case "under":
-                    if(ObjectOne !== ObjectTwo) {
-                      return false;
-                    }
-                    if(node.stacks[ObjectOne].indexOf(literal.args[0]) > node.stacks[ObjectTwo].indexOf(literal.args[1])) {
-                      return false;
-                    }
-                case "beside":
-                    if(ObjectOne === ObjectTwo) {
-                      return false;
-                    }
-                case "above":
-                    if(ObjectOne !== ObjectTwo) {
-                      return false;
-                    }
-                    if(node.stacks[ObjectOne].indexOf(literal.args[0]) < node.stacks[ObjectTwo].indexOf(literal.args[1])) {
-                      return false;
-                    }
-                default:
-                    throw new Error(`Unknown relation: ${literal.relation}`);
-            }
+                return stack.indexOf(literal.args[0]) === stack.indexOf(literal.args[1]) + 1;
+            case "under":
+                if (stackA !== stackB) {
+                    return false;
+                }
+                return stack.indexOf(literal.args[0]) < stack.indexOf(literal.args[1]);
+            case "beside":
+                return stackA !== stackB;
+            case "above":
+                if (stackA !== stackB) {
+                    return false;
+                }
+                return stack.indexOf(literal.args[0]) > stack.indexOf(literal.args[1]);
+            default:
+                throw new Error(`Unknown relation: ${literal.relation}`);
         }
-        return true;
     }
 
-    private getStackId(objectName: string) {
-        const stacks = this.world.stacks
+    private getHeuristicDNF(node: ShrdliteNode, interpretation: DNFFormula) {
+        const values = interpretation.conjuncts.map((conjunction) => this.getHeuristicConjunction(node, conjunction));
+        return Math.max.apply(null, values);
+    }
+
+    private getHeuristicConjunction(node: ShrdliteNode, conjunction: Conjunction) {
+        const values = conjunction.literals.map((literal) => this.getHeuristicLiteral(node, literal));
+        return Math.min.apply(null, values);
+    }
+
+    private getHeuristicLiteral(node: ShrdliteNode, literal: Literal) {
+        if (this.checkGoalLiteral(node, literal)) {
+            // Object is in goal state
+            return 0;
+        }
+
+        let heuristic = 0;
+
+        const stackA = this.getStack(literal.args[0], node.stacks);
+        if (stackA === undefined) {
+            // Object has been picked up (needs: drop)
+            heuristic += 1;
+        } else {
+            // Object is on stack and might be blocked by others (needs: pick up, move, drop)
+            heuristic += (stackA.length - stackA.indexOf(literal.args[0]) + 1) * 3;
+        }
+
+        const stackB = this.getStack(literal.args[1], node.stacks);
+        if (stackB === undefined) {
+            // Object has been picked up (needs: drop)
+            heuristic += 1;
+        } else {
+            // Object is on stack and might be blocked by others (needs: pick up, move, drop)
+            heuristic += (stackB.length - stackB.indexOf(literal.args[1])) * 3;
+        }
+
+        return heuristic;
+    }
+
+    private getStack(objectName: string, stacks: string[][]) {
+        const filteredStacks = stacks
             .filter((stack) => stack.some((obj) =>  obj === objectName));
 
-        if (stacks.length === 0) {
+        if (filteredStacks.length === 0) {
             return undefined;
         }
-        return this.world.stacks.indexOf(stacks[0]);
+        return filteredStacks[0];
     }
 
-    private getHeuristic(node: ShrdliteNode) {
-        return 0;
+    private getStackId(objectName: string, stacks: string[][]) {
+        const stack = this.getStack(objectName, stacks);
+        if (stack === undefined) {
+            return undefined;
+        }
+        return stacks.indexOf(stack);
     }
 }
 
@@ -210,11 +236,13 @@ class ShrdliteNode {
                     throw new Error("Cannot move left from leftmost position");
                 }
                 this.arm--;
+                break;
             case "r":
                 if (this.arm === this.stacks.length - 1) {
                     throw new Error("Cannot move right from rightmost position");
                 }
                 this.arm++;
+                break;
             case "p":
                 if (this.holding !== null) {
                     throw new Error("Cannot pick up an item when already holding something");
@@ -225,6 +253,7 @@ class ShrdliteNode {
                 }
                 const pickedUp = stack.splice(-1, 1);
                 this.holding = pickedUp[0];
+                break;
             case "d":
                 if (this.holding === null) {
                     throw new Error("Cannot drop an item without holding something");
@@ -232,6 +261,7 @@ class ShrdliteNode {
                 // TODO rule validation
                 this.stacks[this.arm].push(this.holding);
                 this.holding = null;
+                break;
         }
 
         this.id = "";
