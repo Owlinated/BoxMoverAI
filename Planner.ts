@@ -102,26 +102,62 @@ class Planner {
             if (literal.args.length !== 2) {
                 throw new Error("Literal needs exactly two arguments");
             }
+            const ObjectOne = this.getStackId(literal.args[0]);
+            const ObjectTwo = this.getStackId(literal.args[1]);
+            if(ObjectOne === undefined || ObjectTwo === undefined) {
+                return false;
+            }
             switch (literal.relation) {
                 case "leftof":
-                    return true;
+                    if(ObjectOne >= ObjectTwo ){
+                      return false;
+                    }
                 case "rightof":
-                    return true;
+                    if(ObjectOne <= ObjectTwo) {
+                      return false;
+                    }
                 case "inside":
-                    return true;
+                /* falls through */
                 case "ontop":
-                    return true;
+                    if(ObjectOne !== ObjectTwo) {
+                      return false;
+                    }
+                    if(node.stacks[ObjectOne].indexOf(literal.args[0]) !== node.stacks[ObjectTwo].indexOf(literal.args[1]) + 1) {
+                      return false;
+                    }
                 case "under":
-                    return true;
+                    if(ObjectOne !== ObjectTwo) {
+                      return false;
+                    }
+                    if(node.stacks[ObjectOne].indexOf(literal.args[0]) > node.stacks[ObjectTwo].indexOf(literal.args[1])) {
+                      return false;
+                    }
                 case "beside":
-                    return true;
+                    if(ObjectOne === ObjectTwo) {
+                      return false;
+                    }
                 case "above":
-                    return true;
+                    if(ObjectOne !== ObjectTwo) {
+                      return false;
+                    }
+                    if(node.stacks[ObjectOne].indexOf(literal.args[0]) < node.stacks[ObjectTwo].indexOf(literal.args[1])) {
+                      return false;
+                    }
                 default:
-                    throw new Error(`Unknown relatio: ${literal.relation}`);
+                    throw new Error(`Unknown relation: ${literal.relation}`);
             }
         }
         return true;
+    }
+
+    private getStackId(objectName: string) {
+        const stacks = this.world.stacks
+            .filter((stack) => stack.some((obj) =>  obj === objectName));
+
+        if (stacks.length === 0) {
+            return undefined;
+        }
+        return this.world.stacks.indexOf(stacks[0]);
     }
 
     private getHeuristic(node: ShrdliteNode) {
