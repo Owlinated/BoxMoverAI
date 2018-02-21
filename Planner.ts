@@ -196,11 +196,13 @@ class Planner {
 
         const stackA = this.getStack(literal.args[0], node.stacks);
         if (stackA === undefined) {
-            // Object has been picked up (needs: drop)
+            // Object has been picked up (needs: move, drop)
             heuristic += 1;
         } else {
-            // Object is on stack and might be blocked by others (needs: pick up, move, drop)
-            heuristic += (stackA.length - stackA.indexOf(literal.args[0]) + 1) * 3;
+            // Object is on stack and might be blocked by others (need: pick up, move, drop)
+            heuristic += (stackA.length - stackA.indexOf(literal.args[0]) - 1) * 3 + 2;
+            // Arm needs to move toward object
+            heuristic += Math.abs(node.stacks.indexOf(stackA) - node.arm);
         }
 
         const objectB = this.getObject(literal.args[1]);
@@ -213,11 +215,39 @@ class Planner {
                 // Object has been picked up (needs: drop)
                 heuristic += 1;
             } else {
-                // Object is on stack and might be blocked by others (needs: pick up, move, drop)
-                heuristic += (stackB.length - stackB.indexOf(literal.args[1])) * 3;
+                // Object is on stack and might be blocked by others (need: pick up, move, drop)
+                heuristic += (stackB.length - stackB.indexOf(literal.args[1]) - 1) * 3;
+            }
+
+            // A and B might need to be moved closer together
+            const posA = stackA === undefined ? node.arm : node.stacks.indexOf(stackA);
+            const posB = stackB === undefined ? node.arm : node.stacks.indexOf(stackB);
+
+            switch (literal.relation) {
+                case "leftof":
+                    heuristic += Math.max(posA - posB + 1, 0);
+                    break;
+                case "rightof":
+                    heuristic += Math.max(posB - posA + 1, 0);
+                    break;
+                case "beside":
+                    heuristic += Math.min(Math.abs(posA - posB + 1), Math.abs(posB - posA + 1));
+                    break;
+                case "inside":
+                /* falls through */
+                case "ontop":
+                /* falls through */
+                case "under":
+                /* falls through */
+                case "above":
+                /* falls through */
+                case "holding":
+                    heuristic += Math.abs(posB - posA);
+                    break;
+                default:
+                    throw new Error(`Unknown relation: ${literal.relation}`);
             }
         }
-
         return heuristic;
     }
 
