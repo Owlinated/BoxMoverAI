@@ -119,9 +119,9 @@ class Interpreter {
                     // any objects && all locations
                     // (o1c1 o1c2 o1c3) or (o2c1 o2c2 o2c3) or (o3c1 o3c2 o3c3) n terms
                     const disjunction: Conjunction[] = [];
-                    for (const constraint of location.entity.objects) {
+                    for (const object of entity.objects) {
                         const conjunction: Literal[] = [];
-                        for (const object of entity.objects) {
+                        for (const constraint of location.entity.objects) {
                             const args = [this.getObjectName(object), this.getObjectName(constraint)];
                             const literal = new Literal(location.relation, args);
                             if (this.isLiteralValid(literal)) {
@@ -152,16 +152,16 @@ class Interpreter {
                             const args = [this.getObjectName(entity.objects[j]),
                                 this.getObjectName(location.entity.objects[counter[j]])];
                             const literal = new Literal(location.relation, args);
-                            if (this.isLiteralValid(literal)) {
-                                conjunction.push(literal);
-                            }
+                            conjunction.push(literal);
                         }
-                        if (conjunction.length > 0) {
+                        // Only add non-empty conjunctions with valid literals
+                        if (conjunction.length > 0
+                            && conjunction.every((literal) => this.isLiteralValid(literal))) {
                             disjunction.push(new Conjunction(conjunction));
                         }
 
                         // Increment counter (base of constraint count)
-                        for (let j = entity.objects.length - 1; j > 0; --j) {
+                        for (let j = entity.objects.length - 1; j >= 0; --j) {
                             counter[j]++;
                             if (counter[j] < location.entity.objects.length) {
                                 break;
