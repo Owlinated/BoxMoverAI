@@ -410,8 +410,8 @@ class Interpreter {
      * Dictionary of functions that say if objectA is in a specific relation to objectB
      */
     private relationTesters: { [relation: string]: RelationTesterFunction; } = {
-        leftof: (objectA, stackA, objectB, stackB) => stackB !== undefined && stackA === stackB - 1,
-        rightof: (objectA, stackA, objectB, stackB) => stackA !== undefined && stackA - 1 === stackB,
+        leftof: (objectA, stackA, objectB, stackB) => stackA !== undefined && stackB !== undefined && stackA < stackB,
+        rightof: (objectA, stackA, objectB, stackB) => stackA !== undefined && stackB !== undefined && stackA > stackB,
         beside: (objectA, stackA, objectB, stackB) =>
             (stackA !== undefined && stackA - 1 === stackB) || (stackB !== undefined && stackA === stackB - 1),
         inside: (objectA, stackA, objectB, stackB) =>

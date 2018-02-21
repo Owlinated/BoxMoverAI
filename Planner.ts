@@ -157,7 +157,8 @@ class Planner {
                 return node.stacks[stackA].indexOf(literal.args[0])
                     < node.stacks[stackB].indexOf(literal.args[1]);
             case "beside":
-                return stackA !== stackB;
+                return (stackA !== undefined && stackA - 1 === stackB)
+                    || (stackB !== undefined && stackA === stackB - 1);
             case "above":
                 if (objectB === this.floor && node.holding !== literal.args[0]) {
                     return true;
