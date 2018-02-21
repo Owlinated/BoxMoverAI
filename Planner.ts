@@ -11,13 +11,7 @@ import {WorldState} from "./World";
  * produced by the Interpreter module and to plan a sequence of
  * actions for the robot to put the world into a state compatible
  * with the user's command, i.e. to achieve what the user wanted.
- *
- * You should implement the function 'makePlan'.
- * The planner should use your A* search implementation to find a plan.
  */
-
-//////////////////////////////////////////////////////////////////////
-// exported functions, classes and interfaces/types
 
 /**
  * Top-level driver for the Planner.
@@ -69,7 +63,7 @@ class Planner {
      *           If there's a planning error, it throws an error with a string description.
      */
     public makePlan(interpretation: DNFFormula): string[] {
-        const startNode = new ShrdliteNode(this.world.stacks, this.world.holding, this.world.arm, undefined);
+        const startNode = new ShrdliteNode(this.world.stacks, this.world.holding, this.world.arm);
         const goalTest = (node: ShrdliteNode) => this.checkGoalDNF(node, interpretation);
         const heuristic = (node: ShrdliteNode) => this.getHeuristicDNF(node, interpretation);
         const path = aStarSearch(new ShrdliteGraph(), startNode, goalTest, heuristic, 10);
@@ -206,7 +200,7 @@ class ShrdliteNode {
     // The column position of the robot arm.
     public  arm: number;
 
-    constructor(stacks: string[][], holding: string | null, arm: number, action: Action | undefined) {
+    constructor(stacks: string[][], holding: string | null, arm: number) {
         // Copy properties
         this.stacks = [];
         for (const stack of stacks) {
@@ -214,11 +208,6 @@ class ShrdliteNode {
         }
         this.holding = holding;
         this.arm = arm;
-
-        // Update properties with action
-        if (action !== undefined) {
-            this.updateState(action);
-        }
     }
 
     public toString(): string {
@@ -229,34 +218,39 @@ class ShrdliteNode {
         return this.id.localeCompare(other.id);
     }
 
-    private updateState(action: Action) {
+    public updateState(action: Action): boolean {
         switch (action) {
             case "l":
                 if (this.arm === 0) {
-                    throw new Error("Cannot move left from leftmost position");
+                    // Cannot move left from leftmost position
+                    return false;
                 }
                 this.arm--;
                 break;
             case "r":
                 if (this.arm === this.stacks.length - 1) {
-                    throw new Error("Cannot move right from rightmost position");
+                    // Cannot move right from rightmost position
+                    return false;
                 }
                 this.arm++;
                 break;
             case "p":
                 if (this.holding !== null) {
-                    throw new Error("Cannot pick up an item when already holding something");
+                    // Cannot pick up an item when already holding something
+                    return false;
                 }
                 const stack = this.stacks[this.arm];
                 if (stack.length === 0) {
-                    throw new Error("Cannot pick up from empty stack");
+                    // Cannot pick up from empty stack
+                    return false;
                 }
                 const pickedUp = stack.splice(-1, 1);
                 this.holding = pickedUp[0];
                 break;
             case "d":
                 if (this.holding === null) {
-                    throw new Error("Cannot drop an item without holding something");
+                    // Cannot drop an item without holding something
+                    return false;
                 }
                 // TODO rule validation
                 this.stacks[this.arm].push(this.holding);
@@ -269,6 +263,7 @@ class ShrdliteNode {
             this.id += stack.join() + "|";
         }
         this.id += this.arm + "|" + this.holding;
+        return true;
     }
 }
 
@@ -280,14 +275,10 @@ class ShrdliteGraph implements Graph<ShrdliteNode> {
         const result = [];
         const actions = ["l", "r", "p", "d"];
         for (const action of actions) {
-            // todo rewrite without exeptions!
-            try {
-                const node = new ShrdliteNode(current.stacks, current.holding, current.arm, action);
-                // todo change cost
-                const successor: Successor<ShrdliteNode> = {child: node, action, cost: 1}
+            const node = new ShrdliteNode(current.stacks, current.holding, current.arm);
+            if (node.updateState(action)) {
+                const successor: Successor<ShrdliteNode> = {child: node, action, cost: 1};
                 result.push(successor);
-            } catch {
-                // Ignore
             }
         }
         return result;
