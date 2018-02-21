@@ -1,6 +1,6 @@
 import {aStarSearch} from "./AStarSearch";
 import {Graph, SearchResult, Successor} from "./Graph";
-import {Conjunction, DNFFormula, Literal, ShrdliteResult} from "./Types";
+import {Conjunction, DNFFormula, Literal, ShrdliteResult, SimpleObject} from "./Types";
 import {WorldState} from "./World";
 
 /*
@@ -51,6 +51,11 @@ class Planner {
     }
 
     /**
+     * Floor of world
+     */
+    private floor = new SimpleObject("floor", null, null);
+
+    /**
      * The core planner method.
      * Note that you should not change the API (type) of this method, only its body.
      * This method should call the A* search implementation with
@@ -61,12 +66,15 @@ class Planner {
      *           If there's a planning error, it throws an error with a string description.
      */
     public makePlan(interpretation: DNFFormula): string[] {
-        return aStarSearch(
-            new ShrdliteGraph(this.world),
+        const search = aStarSearch(
+            new ShrdliteGraph(),
             ShrdliteNode.fromWorld(this.world),
             (node: ShrdliteNode) => this.checkGoalDNF(node, interpretation),
             (node: ShrdliteNode) => this.getHeuristicDNF(node, interpretation),
-            10).path.map((node) => node.action);
+            10);
+        const result = search.path.map((node) => node.action);
+        result.push(`Path with ${search.path.length} moves (${search.visited} visited nodes)`);
+        return result;
     }
 
     private checkGoalDNF(node: ShrdliteNode, interpretation: DNFFormula) {
@@ -88,49 +96,80 @@ class Planner {
         if (literal.args.length !== 2) {
             throw new Error("Literal needs exactly two arguments");
         }
+        const objectA = this.getObject(literal.args[0]);
+        const objectB = this.getObject(literal.args[1]);
         const stackA = this.getStackId(literal.args[0], node.stacks);
         const stackB = this.getStackId(literal.args[1], node.stacks);
-        if (stackA === undefined || stackB === undefined) {
+        if ((stackA === undefined && objectA !== this.floor)
+            || (stackB === undefined && objectB !== this.floor)) {
             return false;
         }
 
-        const stack = node.stacks[stackA];
-
         switch (literal.relation) {
             case "leftof":
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
                 return stackA < stackB;
             case "rightof":
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
                 return stackA > stackB;
             case "inside":
                 if (stackA !== stackB) {
                     return false;
                 }
-                const insideObject = this.world.objects[stack[stack.length - 1]];
-                if (insideObject.form === "box") {
+                if (objectB.form !== "box") {
                     return false;
                 }
-                return stack.indexOf(literal.args[0]) === stack.indexOf(literal.args[1]) + 1;
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                return node.stacks[stackA].indexOf(literal.args[0])
+                    === node.stacks[stackB].indexOf(literal.args[1]) + 1;
             case "ontop":
+                if (objectB === this.floor && stackA !== undefined
+                    && node.stacks[stackA].indexOf(literal.args[0]) === 0) {
+                    return true;
+                }
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
                 if (stackA !== stackB) {
                     return false;
                 }
-                const ontopObject = this.world.objects[stack[stack.length - 1]];
-                if (ontopObject.form !== "box") {
+                if (objectB.form === "box") {
                     return false;
                 }
-                return stack.indexOf(literal.args[0]) === stack.indexOf(literal.args[1]) + 1;
+                return node.stacks[stackA].indexOf(literal.args[0])
+                    === node.stacks[stackB].indexOf(literal.args[1]) + 1;
             case "under":
+                if (objectA === this.floor && node.holding !== literal.args[1]) {
+                    return true;
+                }
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
                 if (stackA !== stackB) {
                     return false;
                 }
-                return stack.indexOf(literal.args[0]) < stack.indexOf(literal.args[1]);
+                return node.stacks[stackA].indexOf(literal.args[0])
+                    < node.stacks[stackB].indexOf(literal.args[1]);
             case "beside":
                 return stackA !== stackB;
             case "above":
+                if (objectB === this.floor && node.holding !== literal.args[0]) {
+                    return true;
+                }
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
                 if (stackA !== stackB) {
                     return false;
                 }
-                return stack.indexOf(literal.args[0]) > stack.indexOf(literal.args[1]);
+                return node.stacks[stackA].indexOf(literal.args[0]) >
+                    node.stacks[stackB].indexOf(literal.args[1]);
             default:
                 throw new Error(`Unknown relation: ${literal.relation}`);
         }
@@ -163,16 +202,34 @@ class Planner {
             heuristic += (stackA.length - stackA.indexOf(literal.args[0]) + 1) * 3;
         }
 
-        const stackB = this.getStack(literal.args[1], node.stacks);
-        if (stackB === undefined) {
-            // Object has been picked up (needs: drop)
-            heuristic += 1;
+        const objectB = this.getObject(literal.args[1]);
+        if (objectB === this.floor) {
+            // Object is on the floor, the lowest stack of items will need to be moved (needs: pick up, move, drop)
+            heuristic += Math.min.apply(null, node.stacks.map((stack) => stack.length)) * 3;
         } else {
-            // Object is on stack and might be blocked by others (needs: pick up, move, drop)
-            heuristic += (stackB.length - stackB.indexOf(literal.args[1])) * 3;
+            const stackB = this.getStack(literal.args[1], node.stacks);
+            if (stackB === undefined) {
+                // Object has been picked up (needs: drop)
+                heuristic += 1;
+            } else {
+                // Object is on stack and might be blocked by others (needs: pick up, move, drop)
+                heuristic += (stackB.length - stackB.indexOf(literal.args[1])) * 3;
+            }
         }
 
         return heuristic;
+    }
+
+    /**
+     * Lookup an objects by its name in the world
+     * @param {SimpleObject} name: The name of the object to look up
+     * @returns {string} The object matching the name
+     */
+    private getObject(name: string): SimpleObject {
+        if (name === "floor") {
+            return this.floor;
+        }
+        return this.world.objects[name];
     }
 
     private getStack(objectName: string, stacks: string[][]) {
@@ -324,9 +381,6 @@ class ShrdliteNode {
  * A* search graph, to be implemented and cleaned
  */
 class ShrdliteGraph implements Graph<ShrdliteNode> {
-    constructor(private world: WorldState) {
-    }
-
     public successors(current: ShrdliteNode): Array<Successor<ShrdliteNode>> {
         const result = [];
         const actions = ["l", "r", "p", "d"];
