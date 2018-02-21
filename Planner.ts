@@ -1,4 +1,3 @@
-
 import {aStarSearch} from "./AStarSearch";
 import {Graph, SearchResult, Successor} from "./Graph";
 import {Conjunction, DNFFormula, Literal, ShrdliteResult} from "./Types";
@@ -48,9 +47,8 @@ export function plan(interpretations: ShrdliteResult[], world: WorldState): Shrd
 }
 
 class Planner {
-    constructor(
-        private world: WorldState,
-    ) {}
+    constructor(private world: WorldState) {
+    }
 
     /**
      * The core planner method.
@@ -63,12 +61,12 @@ class Planner {
      *           If there's a planning error, it throws an error with a string description.
      */
     public makePlan(interpretation: DNFFormula): string[] {
-        const startNode = new ShrdliteNode(this.world.stacks, this.world.holding, this.world.arm);
-        const goalTest = (node: ShrdliteNode) => this.checkGoalDNF(node, interpretation);
-        const heuristic = (node: ShrdliteNode) => this.getHeuristicDNF(node, interpretation);
-        const path = aStarSearch(new ShrdliteGraph(), startNode, goalTest, heuristic, 10);
-        const result = path.path.map((node) => node.action);
-        return result;
+        return aStarSearch(
+            new ShrdliteGraph(this.world),
+            ShrdliteNode.fromWorld(this.world),
+            (node: ShrdliteNode) => this.checkGoalDNF(node, interpretation),
+            (node: ShrdliteNode) => this.getHeuristicDNF(node, interpretation),
+            10).path.map((node) => node.action);
     }
 
     private checkGoalDNF(node: ShrdliteNode, interpretation: DNFFormula) {
@@ -104,9 +102,20 @@ class Planner {
             case "rightof":
                 return stackA > stackB;
             case "inside":
-            /* falls through */
+                if (stackA !== stackB) {
+                    return false;
+                }
+                const insideObject = this.world.objects[stack[stack.length - 1]];
+                if (insideObject.form === "box") {
+                    return false;
+                }
+                return stack.indexOf(literal.args[0]) === stack.indexOf(literal.args[1]) + 1;
             case "ontop":
                 if (stackA !== stackB) {
+                    return false;
+                }
+                const ontopObject = this.world.objects[stack[stack.length - 1]];
+                if (ontopObject.form !== "box") {
                     return false;
                 }
                 return stack.indexOf(literal.args[0]) === stack.indexOf(literal.args[1]) + 1;
@@ -168,7 +177,7 @@ class Planner {
 
     private getStack(objectName: string, stacks: string[][]) {
         const filteredStacks = stacks
-            .filter((stack) => stack.some((obj) =>  obj === objectName));
+            .filter((stack) => stack.some((obj) => obj === objectName));
 
         if (filteredStacks.length === 0) {
             return undefined;
@@ -189,25 +198,26 @@ class Planner {
  * A* search nodes, to be implemented and cleaned
  */
 class ShrdliteNode {
-    // These are for making the nodes possible to compare efficiently:
+    // String identifier for efficient comparison
     public id: string;
 
-    // Changing properties of the world:
-    // Where the objects are located in the world.
+    // Copy of the worlds stacks
     public stacks: string[][];
-    // Which object the robot is currently holding, or null if not holding anything.
-    public holding: string | null;
-    // The column position of the robot arm.
-    public  arm: number;
 
-    constructor(stacks: string[][], holding: string | null, arm: number) {
-        // Copy properties
+    constructor(stacks: string[][], public holding: string | null, public  arm: number, private world: WorldState) {
+        // Make copy of stacks
         this.stacks = [];
         for (const stack of stacks) {
             this.stacks.push(stack.slice());
         }
-        this.holding = holding;
-        this.arm = arm;
+    }
+
+    public clone(): ShrdliteNode {
+        return new ShrdliteNode(this.stacks, this.holding, this.arm, this.world);
+    }
+
+    public static fromWorld(world: WorldState): ShrdliteNode {
+        return new ShrdliteNode(world.stacks, world.holding, world.arm, world);
     }
 
     public toString(): string {
@@ -220,6 +230,7 @@ class ShrdliteNode {
 
     public updateState(action: Action): boolean {
         switch (action) {
+            // Move arm left
             case "l":
                 if (this.arm === 0) {
                     // Cannot move left from leftmost position
@@ -227,6 +238,7 @@ class ShrdliteNode {
                 }
                 this.arm--;
                 break;
+            // Move arm right
             case "r":
                 if (this.arm === this.stacks.length - 1) {
                     // Cannot move right from rightmost position
@@ -234,25 +246,66 @@ class ShrdliteNode {
                 }
                 this.arm++;
                 break;
+            // Pick up object
             case "p":
                 if (this.holding !== null) {
                     // Cannot pick up an item when already holding something
                     return false;
                 }
-                const stack = this.stacks[this.arm];
-                if (stack.length === 0) {
+                const pickStack = this.stacks[this.arm];
+                if (pickStack.length === 0) {
                     // Cannot pick up from empty stack
                     return false;
                 }
-                const pickedUp = stack.splice(-1, 1);
+                const pickedUp = pickStack.splice(-1, 1);
                 this.holding = pickedUp[0];
                 break;
+            // Drop object
             case "d":
                 if (this.holding === null) {
                     // Cannot drop an item without holding something
                     return false;
                 }
-                // TODO rule validation
+
+                // Can drop anything on the floor
+                const dropStack = this.stacks[this.arm];
+                if (dropStack.length !== 0) {
+                    const objectA = this.world.objects[this.holding];
+                    const objectB = this.world.objects[dropStack[dropStack.length - 1]];
+                    if (objectB.form === "ball") {
+                        // Cannot drop anything on a ball
+                        return false;
+                    }
+                    if (objectB.form === "box") {
+                        // Inside box
+                        if (objectA.size === "large" && objectB.size === "small") {
+                            return false;
+                        }
+                        if (objectA.form === "pyramid" || objectA.form === "plank" || objectA.form === "box") {
+                            if (objectB.size === "small" || objectA.size === "large") {
+                                return false;
+                            }
+                        }
+                    } else {
+                        // On object
+                        if (objectA.size === "large" && objectB.size === "small") {
+                            return false;
+                        }
+                        if (objectA.form === "ball") {
+                            return false;
+                        }
+                        if (objectA.form === "box" && objectA.size === "small") {
+                            if ((objectB.form === "brick" || objectB.form === "pyramid") && objectB.size === "small") {
+                                return false;
+                            }
+                        }
+                        if (objectA.form === "box" && objectA.size === "large") {
+                            if (objectB.form === "pyramid") {
+                                return false;
+                            }
+                        }
+                    }
+                }
                 this.stacks[this.arm].push(this.holding);
                 this.holding = null;
                 break;
@@ -271,11 +324,14 @@ class ShrdliteNode {
  * A* search graph, to be implemented and cleaned
  */
 class ShrdliteGraph implements Graph<ShrdliteNode> {
+    constructor(private world: WorldState) {
+    }
+
     public successors(current: ShrdliteNode): Array<Successor<ShrdliteNode>> {
         const result = [];
         const actions = ["l", "r", "p", "d"];
         for (const action of actions) {
-            const node = new ShrdliteNode(current.stacks, current.holding, current.arm);
+            const node = current.clone();
             if (node.updateState(action)) {
                 const successor: Successor<ShrdliteNode> = {child: node, action, cost: 1};
                 result.push(successor);
