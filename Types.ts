@@ -50,6 +50,12 @@ export class MoveCommand {
     public clone(): MoveCommand {return new MoveCommand(this.entity.clone(), this.location.clone()); }
 }
 
+export class Clarification {
+    constructor(public object: Object) {}
+    public toString(): string {return `Clarification(${this.object.toString()})`; }
+    public clone(): Clarification {return new Clarification(this.object.clone()); }
+}
+
 /*
 // Here's an example of a class definition for a new command
 // Don't forget to add it to the type definition of 'Command' above

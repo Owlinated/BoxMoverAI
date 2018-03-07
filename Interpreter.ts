@@ -1,3 +1,4 @@
+import {AmbiguityError} from "./AmbiguityError";
 import {WorldState} from "./World";
 
 import {
@@ -41,13 +42,18 @@ import * as util from "./lib/typescript-collections/src/lib/util";
  * It calls 'interpretCommand' for each possible parse of the command.
  * You don't have to change this function.
  * @param parses: List of parses produced by the Parser.
+ * @param clarifications: Clarifications to resolve ambiguities
  * @param world: The current state of the world.
  * @returns: List of interpretation results, which are the parse results augmented
  *           with interpretations. Each interpretation is represented by a DNFFormula.
  *           If there's an interpretation error, it throws an error with a string description.
  */
-export function interpret(parses: ShrdliteResult[], world: WorldState): ShrdliteResult[] {
-    const errors: string[] = [];
+export function interpret(
+    parses: ShrdliteResult[],
+    clarifications: ShrdliteResult[][],
+    world: WorldState): ShrdliteResult[] {
+
+    const errors: Error[] = [];
     const interpretations: ShrdliteResult[] = [];
     const interpreter: Interpreter = new Interpreter(world);
 
@@ -63,6 +69,12 @@ export function interpret(parses: ShrdliteResult[], world: WorldState): Shrdlite
         interpretations.push(result);
     }
     if (interpretations.length === 0) {
+        // Find any ambiguity errors and throw the first one
+        const ambiguityErrors = errors.filter((error) => error instanceof AmbiguityError)
+        if (ambiguityErrors.length > 0) {
+            throw ambiguityErrors[0];
+        }
+
         // merge all errors into one
         throw errors.join(" ; ");
     }
@@ -299,6 +311,9 @@ class Interpreter {
      */
     private resolveAmbiguity(objects: SimpleObject[]): SimpleObject {
         // TODO implement as extension (see docs/extensions.md)
+        if(objects.length > 1) {
+            throw new AmbiguityError("Soo many objects");
+        }
         return objects[0];
     }
 

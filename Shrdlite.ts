@@ -1,8 +1,8 @@
-
+import {AmbiguityError} from "./AmbiguityError";
 import {interpret} from "./Interpreter";
 import {parse} from "./Parser";
 import {plan} from "./Planner";
-import {ShrdliteResult} from "./Types";
+import {Clarification, Command, ShrdliteResult, TakeCommand} from "./Types";
 import {World} from "./World";
 
 /********************************************************************************
@@ -15,6 +15,9 @@ You should do some minor changes to the function 'parseUtteranceIntoPlan',
 look for PLACEHOLDER below.
 Everything else can be left as they are.
 ********************************************************************************/
+
+let Command: ShrdliteResult[] | undefined = undefined;
+let Clarifications: ShrdliteResult[][] = [];
 
 /**
  * Generic function that takes an utterance and returns a plan. It works according to the following pipeline:
@@ -42,7 +45,8 @@ Everything else can be left as they are.
  *           is either a robot action, like "p" (for pick up) or "r" (for going right),
  *           or a system utterance in English that describes what the robot is doing.
  */
-export function parseUtteranceIntoPlan(world: World, utterance: string): string[] | null {
+// todo add parameter, last request
+export function parseUtteranceIntoPlan(world: World, utterance: string): string[] | null | string {
     let parses;
     let interpretations;
     let plans: string | ShrdliteResult[];
@@ -60,10 +64,25 @@ export function parseUtteranceIntoPlan(world: World, utterance: string): string[
         world.printDebugInfo(`  (${n}) ${result.parse.toString()}`);
     });
 
+    if (parses.some((parse) => parse instanceof Clarification)) {
+        if (Command === undefined) {
+            world.printError("Expected an instruction, please enter a command.");
+            return null;
+        }
+        Clarifications.push(parses);
+    } else {
+        Command = parses;
+        Clarifications.length = 0;
+    }
+
     // Call the interpreter for all parses, and then log the interpretations
     try {
-        interpretations = interpret(parses, world.currentState);
+        interpretations = interpret(Command, Clarifications, world.currentState);
+        // todo clear clarification list once suceeded
     } catch (err) {
+        if (err instanceof AmbiguityError) {
+            return err.message;
+        }
         world.printError("[Interpretation failure]", err);
         return null;
     }
