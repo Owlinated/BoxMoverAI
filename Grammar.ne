@@ -12,11 +12,7 @@
 @{%
 import {
     Command, TakeCommand, DropCommand, MoveCommand,
-    /*
-    // Here's an example of a new command
-    // Don't forget to add the corresponding grammar rules below
-    WhereisCommand,
-    */
+    Clarification,
     Location, Entity,
     Object, RelativeObject, SimpleObject,
 } from "./Types";
@@ -24,7 +20,8 @@ import {
 
 ## Grammar rules
 
-main --> will_you:? please:? command please:?  {% (d) => d[2] %}  
+main --> will_you:? please:? command please:?  {% (d) => d[2] %}
+main --> objectClarification please:? {% (d) => new Clarification(d[0]) %}
 
 command --> take entity           {% (d) => new TakeCommand(d[1]) %}
 command --> move  it    location  {% (d) => new DropCommand(d[2]) %}
@@ -46,6 +43,9 @@ objectPL --> objectPL that_are:? location  {% (d) => new RelativeObject(d[0], d[
 
 objectSG --> size:? color:? formSG  {% (d) => new SimpleObject(d[2], d[0], d[1]) %}
 objectPL --> size:? color:? formPL  {% (d) => new SimpleObject(d[2], d[0], d[1]) %}
+
+objectClarification --> objectSG {% (d) => d[0] %}
+objectClarification --> size:? color:? formClarification {% (d) => new SimpleObject(d[2], d[0], d[1]) %}
 
 ## Lexical rules
 
@@ -77,6 +77,8 @@ formPL --> form "s"  {% (d) => d[0] %}
 
 formSG --> "box"    {% (d) => "box" %}
 formPL --> "boxes"  {% (d) => "box" %}
+
+formClarification --> "one" {% (d) => "anyform" %}
 
 form --> ("object" | "thing" | "form")  {% (d) => "anyform" %}
 form --> "brick"    {% (d) => "brick" %}

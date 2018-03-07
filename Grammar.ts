@@ -1,23 +1,37 @@
-// Generated automatically by nearley
+// Generated automatically by nearley, version 2.13.0
 // http://github.com/Hardmath123/nearley
-function id(d:any[]):any {return d[0];}
+// Bypasses TS6133. Allow declared but unused functions.
+// @ts-ignore
+function id(d: any[]): any { return d[0]; }
 
 import {
     Command, TakeCommand, DropCommand, MoveCommand,
-    /*
-    // Here's an example of a new command
-    // Don't forget to add the corresponding grammar rules below
-    WhereisCommand,
-    */
+    Clarification,
     Location, Entity,
     Object, RelativeObject, SimpleObject,
 } from "./Types";
-export interface Token {value:any; [key: string]:any};
-export interface Lexer {reset:(chunk:string, info:any) => void; next:() => Token | undefined; save:() => any; formatError:(token:Token) => string; has:(tokenType:string) => boolean};
-export interface NearleyRule {name:string; symbols:NearleySymbol[]; postprocess?:(d:any[],loc?:number,reject?:{})=>any};
-export type NearleySymbol = string | {literal:any} | {test:(token:any) => boolean};
-export var Lexer:Lexer|undefined = undefined;
-export var ParserRules:NearleyRule[] = [
+
+export interface Token { value: any; [key: string]: any };
+
+export interface Lexer {
+  reset: (chunk: string, info: any) => void;
+  next: () => Token | undefined;
+  save: () => any;
+  formatError: (token: Token) => string;
+  has: (tokenType: string) => boolean
+};
+
+export interface NearleyRule {
+  name: string;
+  symbols: NearleySymbol[];
+  postprocess?: (d: any[], loc?: number, reject?: {}) => any
+};
+
+export type NearleySymbol = string | { literal: any } | { test: (token: any) => boolean };
+
+export var Lexer: Lexer | undefined = undefined;
+
+export var ParserRules: NearleyRule[] = [
     {"name": "main$ebnf$1", "symbols": ["will_you"], "postprocess": id},
     {"name": "main$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "main$ebnf$2", "symbols": ["please"], "postprocess": id},
@@ -25,6 +39,9 @@ export var ParserRules:NearleyRule[] = [
     {"name": "main$ebnf$3", "symbols": ["please"], "postprocess": id},
     {"name": "main$ebnf$3", "symbols": [], "postprocess": () => null},
     {"name": "main", "symbols": ["main$ebnf$1", "main$ebnf$2", "command", "main$ebnf$3"], "postprocess": (d) => d[2]},
+    {"name": "main$ebnf$4", "symbols": ["please"], "postprocess": id},
+    {"name": "main$ebnf$4", "symbols": [], "postprocess": () => null},
+    {"name": "main", "symbols": ["objectClarification", "main$ebnf$4"], "postprocess": (d) => new Clarification(d[0])},
     {"name": "command", "symbols": ["take", "entity"], "postprocess": (d) => new TakeCommand(d[1])},
     {"name": "command", "symbols": ["move", "it", "location"], "postprocess": (d) => new DropCommand(d[2])},
     {"name": "command", "symbols": ["move", "entity", "location"], "postprocess": (d) => new MoveCommand(d[1], d[2])},
@@ -50,6 +67,12 @@ export var ParserRules:NearleyRule[] = [
     {"name": "objectPL$ebnf$3", "symbols": ["color"], "postprocess": id},
     {"name": "objectPL$ebnf$3", "symbols": [], "postprocess": () => null},
     {"name": "objectPL", "symbols": ["objectPL$ebnf$2", "objectPL$ebnf$3", "formPL"], "postprocess": (d) => new SimpleObject(d[2], d[0], d[1])},
+    {"name": "objectClarification", "symbols": ["objectSG"], "postprocess": (d) => d[0]},
+    {"name": "objectClarification$ebnf$1", "symbols": ["size"], "postprocess": id},
+    {"name": "objectClarification$ebnf$1", "symbols": [], "postprocess": () => null},
+    {"name": "objectClarification$ebnf$2", "symbols": ["color"], "postprocess": id},
+    {"name": "objectClarification$ebnf$2", "symbols": [], "postprocess": () => null},
+    {"name": "objectClarification", "symbols": ["objectClarification$ebnf$1", "objectClarification$ebnf$2", "formClarification"], "postprocess": (d) => new SimpleObject(d[2], d[0], d[1])},
     {"name": "quantifierSG$subexpression$1$string$1", "symbols": [{"literal":"a"}, {"literal":"n"}, {"literal":"y"}], "postprocess": (d) => d.join('')},
     {"name": "quantifierSG$subexpression$1", "symbols": ["quantifierSG$subexpression$1$string$1"]},
     {"name": "quantifierSG$subexpression$1$string$2", "symbols": [{"literal":"a"}, {"literal":"n"}], "postprocess": (d) => d.join('')},
@@ -136,6 +159,8 @@ export var ParserRules:NearleyRule[] = [
     {"name": "formSG", "symbols": ["formSG$string$1"], "postprocess": (d) => "box"},
     {"name": "formPL$string$1", "symbols": [{"literal":"b"}, {"literal":"o"}, {"literal":"x"}, {"literal":"e"}, {"literal":"s"}], "postprocess": (d) => d.join('')},
     {"name": "formPL", "symbols": ["formPL$string$1"], "postprocess": (d) => "box"},
+    {"name": "formClarification$string$1", "symbols": [{"literal":"o"}, {"literal":"n"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
+    {"name": "formClarification", "symbols": ["formClarification$string$1"], "postprocess": (d) => "anyform"},
     {"name": "form$subexpression$1$string$1", "symbols": [{"literal":"o"}, {"literal":"b"}, {"literal":"j"}, {"literal":"e"}, {"literal":"c"}, {"literal":"t"}], "postprocess": (d) => d.join('')},
     {"name": "form$subexpression$1", "symbols": ["form$subexpression$1$string$1"]},
     {"name": "form$subexpression$1$string$2", "symbols": [{"literal":"t"}, {"literal":"h"}, {"literal":"i"}, {"literal":"n"}, {"literal":"g"}], "postprocess": (d) => d.join('')},
@@ -185,4 +210,5 @@ export var ParserRules:NearleyRule[] = [
     {"name": "please$string$1", "symbols": [{"literal":"p"}, {"literal":"l"}, {"literal":"e"}, {"literal":"a"}, {"literal":"s"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
     {"name": "please", "symbols": ["please$string$1"]}
 ];
-export var ParserStart:string = "main";
+
+export var ParserStart: string = "main";
