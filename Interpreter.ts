@@ -267,11 +267,12 @@ class Interpreter {
                         for (const constraint of location.entity.objects) {
                             const args = [this.getObjectName(object), this.getObjectName(constraint)];
                             const literal = new Literal(location.relation, args);
-                            if (this.isLiteralValid(literal)) {
-                                conjunction.push(literal);
-                            }
+                            conjunction.push(literal);
                         }
-                        if (conjunction.length > 0) {
+
+                        // Only add non-empty conjunctions with valid literals
+                        if (conjunction.length > 0
+                            && conjunction.every((literal) => this.isLiteralValid(literal))) {
                             disjunction.push(new Conjunction(conjunction));
                         }
                     }
