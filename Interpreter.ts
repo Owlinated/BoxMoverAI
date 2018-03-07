@@ -55,30 +55,161 @@ export function interpret(
 
     const errors: Error[] = [];
     const interpretations: ShrdliteResult[] = [];
+    const ambiguousParses: ShrdliteResult[] = [];
     const interpreter: Interpreter = new Interpreter(world);
 
-    for (const result of parses) {
-        console.log(result);
+    for (const parse of parses) {
+        console.log(parse);
         try {
-            const intp: DNFFormula = interpreter.interpretCommand(result.parse);
-            result.interpretation = intp;
+            const intp: DNFFormula = interpreter.interpretCommand(parse.parse);
+            ambiguousParses.push(parse);
+            parse.interpretation = intp;
+            interpretations.push(parse);
         } catch (err) {
+            if (err instanceof AmbiguityError) {
+                ambiguousParses.push(parse);
+            }
             errors.push(err);
             continue;
         }
-        interpretations.push(result);
     }
-    if (interpretations.length === 0) {
-        // Find any ambiguity errors and throw the first one
-        const ambiguityErrors = errors.filter((error) => error instanceof AmbiguityError)
-        if (ambiguityErrors.length > 0) {
-            throw ambiguityErrors[0];
-        }
 
+    if (interpretations.length === 1) {
+        return interpretations;
+    }
+
+    if (ambiguousParses.length === 0) {
         // merge all errors into one
         throw errors.join(" ; ");
     }
-    return interpretations;
+
+    const ambiguousObjects: Array<{parse: ShrdliteResult, entity: Object}> = [];
+    for (const parse of ambiguousParses) {
+        if (parse.parse instanceof MoveCommand) {
+            ambiguousObjects.push({parse, entity: parse.parse.entity.object});
+        } else if (parse.parse instanceof TakeCommand) {
+            ambiguousObjects.push({parse, entity: parse.parse.entity.object});
+        } else {
+            throw Error(`Unexpected ambiguity in ${parse}`);
+        }
+    }
+
+    while (ambiguousObjects.length > 1 && clarifications.length > 0) {
+        // fiter ambiguous objects
+        // remove clarification
+    }
+
+    if (ambiguousObjects.length <= 1) {
+        return ambiguousObjects.map((parse) => parse.parse);
+    }
+
+    const objectsDescription = ListObjects(ambiguousObjects.map((parse) => parse.entity));
+    throw new AmbiguityError(`Do you want me to move ${objectsDescription}?`);
+}
+
+// By Form
+function ListObjects(objects: Object[]): string {
+    if (objects.length === 0) {
+        throw new Error("Objects cannot be empty");
+    }
+    const grouped = GroupBy(objects, (object) => GetSimple(object).form);
+    const keys = Object.keys(grouped);
+    /*if (keys.length === 1) {
+        return `the ${ListObjectsByColor((grouped as any)[keys[0]], "one")}`;
+    }*/
+    const terms = keys.map((key) => ListObjectsByColor((grouped as any)[key], key));
+    return `the ${StringOrJoin(terms)}`;
+}
+
+function ListObjectsByColor(objects: Object[], description: string): string {
+    if (objects.length === 0) {
+        throw new Error("Objects cannot be empty");
+    }
+    const grouped = GroupBy(objects, (object) => GetSimple(object).color);
+    const keys = Object.keys(grouped);
+    if (keys.length === 1) {
+        return ListObjectsBySize((grouped as any)[keys[0]], description);
+    }
+    const terms = keys.map((key) =>
+        ListObjectsBySize((grouped as any)[key], key === "undefined" ? "any color" : key + description));
+    return `the ${StringOrJoin(terms)}`;
+}
+
+function ListObjectsBySize(objects: Object[], description: string): string {
+    if (objects.length === 0) {
+        throw new Error("Objects cannot be empty");
+    }
+    const grouped = GroupBy(objects, (object) => GetSimple(object).size);
+    const keys = Object.keys(grouped);
+    if (keys.length === 1) {
+        return ListObjectsByLocation((grouped as any)[keys[0]], description);
+    }
+    const terms = keys.map((key) =>
+        ListObjectsByLocation((grouped as any)[key], key === "undefined" ? "any size" : key + description));
+    return `the ${StringOrJoin(terms)}`;
+}
+
+function ListObjectsByLocation(objects: Object[], description: string): string {
+    if (objects.length === 0) {
+        throw new Error("Objects cannot be empty");
+    }
+    const grouped = GroupBy(
+        objects,
+        (object) => object instanceof RelativeObject ? DescribeLocation(object.location) : undefined);
+    const keys = Object.keys(grouped);
+    if (keys.length === 1) {
+        return description;
+    }
+    const terms = keys.map((key) => key === "undefined" ? "at any location" : key);
+    return `${description} ${terms.join(" or the one ")}`;
+}
+
+function DescribeLocation(location: Location): string {
+    return `that is ${location.relation} ${DescribeEntity(location.entity)}`;
+}
+
+function DescribeEntity(entity: Entity): string {
+    return `${entity.quantifier} ${DescribeObject(entity.object)}`;
+}
+
+function DescribeObject(object: Object): string {
+    const locations: Location[] = [];
+    let relativeObject = object;
+    while (relativeObject instanceof RelativeObject) {
+        locations.push(relativeObject.location);
+        relativeObject = relativeObject.object;
+    }
+    return `${DescribeSimpleObject(relativeObject)} ${locations.map(DescribeLocation).join(" ")}`;
+}
+
+function DescribeSimpleObject(object: SimpleObject): string {
+    return (object.size === null ? "" : object.size + " ")
+        + (object.color === null ? "" : object.color + " ")
+        + object.form;
+}
+
+function StringOrJoin(strings: string[]): string {
+    if (strings.length === 1) {
+        return strings[0];
+    }
+    let last = strings.splice(-1, 1)[0];
+    last = (strings.length > 1 ? ", or " : " or ") + last;
+    return strings.join(", ") + last;
+}
+
+function GroupBy<T>(values: T[], key: (value: T) => any) {
+    return values.reduce(function(accumulation, next) {
+        ((accumulation as any)[key(next)] = (accumulation as any)[key(next)] || []).push(next);
+        return accumulation;
+    }, {});
+}
+
+function GetSimple(object: Object): SimpleObject {
+    let obj = object;
+    while (obj instanceof RelativeObject) {
+        obj = obj.object;
+    }
+    return obj;
 }
 
 /**
@@ -311,7 +442,7 @@ class Interpreter {
      */
     private resolveAmbiguity(objects: SimpleObject[]): SimpleObject {
         // TODO implement as extension (see docs/extensions.md)
-        if(objects.length > 1) {
+        if (objects.length > 1) {
             throw new AmbiguityError("Soo many objects");
         }
         return objects[0];
