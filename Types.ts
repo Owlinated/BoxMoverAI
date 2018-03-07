@@ -51,7 +51,7 @@ export class MoveCommand {
 }
 
 export class Clarification {
-    constructor(public object: Object) {}
+    constructor(public object: Entity) {}
     public toString(): string {return `Clarification(${this.object.toString()})`; }
     public clone(): Clarification {return new Clarification(this.object.clone()); }
 }

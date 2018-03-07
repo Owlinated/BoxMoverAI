@@ -21,7 +21,7 @@ import {
 ## Grammar rules
 
 main --> will_you:? please:? command please:?  {% (d) => d[2] %}
-main --> objectClarification please:? {% (d) => new Clarification(d[0]) %}
+main --> will_you_use:? entityClarification please:? {% (d) => new Clarification(d[1]) %}
 
 command --> take entity           {% (d) => new TakeCommand(d[1]) %}
 command --> move  it    location  {% (d) => new DropCommand(d[2]) %}
@@ -37,15 +37,13 @@ location --> relation entity  {% (d) => new Location(d[0], d[1]) %}
 entity --> quantifierSG objectSG  {% (d) => new Entity(d[0], d[1]) %}
 entity --> quantifierPL objectPL  {% (d) => new Entity(d[0], d[1]) %}
 entity --> "the" "floor"          {% (d) => new Entity("the", new SimpleObject("floor", null, null)) %}
+entityClarification --> entity    {% (d) => d[0] %}
 
 objectSG --> objectSG that_is:?  location  {% (d) => new RelativeObject(d[0], d[2]) %}
 objectPL --> objectPL that_are:? location  {% (d) => new RelativeObject(d[0], d[2]) %}
 
 objectSG --> size:? color:? formSG  {% (d) => new SimpleObject(d[2], d[0], d[1]) %}
 objectPL --> size:? color:? formPL  {% (d) => new SimpleObject(d[2], d[0], d[1]) %}
-
-objectClarification --> objectSG {% (d) => d[0] %}
-objectClarification --> size:? color:? formClarification {% (d) => new SimpleObject(d[2], d[0], d[1]) %}
 
 ## Lexical rules
 
@@ -78,9 +76,7 @@ formPL --> form "s"  {% (d) => d[0] %}
 formSG --> "box"    {% (d) => "box" %}
 formPL --> "boxes"  {% (d) => "box" %}
 
-formClarification --> "one" {% (d) => "anyform" %}
-
-form --> ("object" | "thing" | "form")  {% (d) => "anyform" %}
+form --> ("object" | "thing" | "form" | "one")  {% (d) => "anyform" %}
 form --> "brick"    {% (d) => "brick" %}
 form --> "plank"    {% (d) => "plank" %}
 form --> "ball"     {% (d) => "ball" %}
@@ -98,6 +94,7 @@ that_is  --> "that" "is"
 that_are --> "that" "are"
 
 will_you --> ("will" | "can" | "could") "you"
+will_you_use --> will_you "use"
 
 please --> "please"
 
