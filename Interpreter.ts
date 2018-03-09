@@ -70,7 +70,6 @@ export function interpret(
                 ambiguousParses.push(parse);
             }
             errors.push(err);
-            continue;
         }
     }
 
@@ -100,7 +99,8 @@ export function interpret(
     }
 
     if (ambiguousObjects.length <= 1) {
-        return ambiguousObjects.map((parse) => parse.parse);
+        const result = ambiguousObjects[0].parse;
+        result.interpretation = interpreter.interpretCommand(result.parse);
     }
 
     const objectsDescription = ListObjects(ambiguousObjects.map((parse) => parse.entity));
@@ -117,8 +117,8 @@ function ListObjects(objects: Object[]): string {
     /*if (keys.length === 1) {
         return `the ${ListObjectsByColor((grouped as any)[keys[0]], "one")}`;
     }*/
-    const terms = keys.map((key) => ListObjectsByColor((grouped as any)[key], key));
-    return `the ${StringOrJoin(terms)}`;
+    const terms = keys.map((key) => `${ListObjectsByColor((grouped as any)[key], key)}`);
+    return StringOrJoin(terms);
 }
 
 function ListObjectsByColor(objects: Object[], description: string): string {
@@ -131,8 +131,8 @@ function ListObjectsByColor(objects: Object[], description: string): string {
         return ListObjectsBySize((grouped as any)[keys[0]], description);
     }
     const terms = keys.map((key) =>
-        ListObjectsBySize((grouped as any)[key], key === "undefined" ? "any color" : key + description));
-    return `the ${StringOrJoin(terms)}`;
+        ListObjectsBySize((grouped as any)[key], `${key === "undefined" ? "any color" : key} ${description}`));
+    return ` ${StringOrJoin(terms)}`;
 }
 
 function ListObjectsBySize(objects: Object[], description: string): string {
@@ -142,11 +142,11 @@ function ListObjectsBySize(objects: Object[], description: string): string {
     const grouped = GroupBy(objects, (object) => GetSimple(object).size);
     const keys = Object.keys(grouped);
     if (keys.length === 1) {
-        return ListObjectsByLocation((grouped as any)[keys[0]], description);
+        return `the ${ListObjectsByLocation((grouped as any)[keys[0]], description)}`;
     }
     const terms = keys.map((key) =>
-        ListObjectsByLocation((grouped as any)[key], key === "undefined" ? "any size" : key + description));
-    return `the ${StringOrJoin(terms)}`;
+        ListObjectsByLocation((grouped as any)[key], key === "undefined" ? "any size" : key));
+    return ` the ${StringOrJoin(terms)} ${description}`;
 }
 
 function ListObjectsByLocation(objects: Object[], description: string): string {
@@ -165,6 +165,10 @@ function ListObjectsByLocation(objects: Object[], description: string): string {
 }
 
 function DescribeLocation(location: Location): string {
+    const clarifications: string[] = ["that is held", "at any location"];
+    if (clarifications.indexOf(location.relation) >= 0) {
+        return location.relation;
+    }
     return `that is ${location.relation} ${DescribeEntity(location.entity)}`;
 }
 
@@ -224,6 +228,7 @@ class Interpreter {
      * Floor of world
      */
     private floor = new SimpleObject("floor", null, null);
+    private floorEntity = new Entity("the", this.floor);
 
     public interpretCommand(cmd: Command): DNFFormula {
         const result = this.interpretCommandInternal(cmd);
@@ -442,11 +447,25 @@ class Interpreter {
      * @returns {SimpleObject} The object desired by the user
      */
     private resolveAmbiguity(objects: SimpleObject[]): SimpleObject {
-        // TODO implement as extension (see docs/extensions.md)
-        if (objects.length > 1) {
-            throw new AmbiguityError("Soo many objects");
+        // todo actually use clarification
+        if (objects.length === 1) {
+            return objects[0];
         }
-        return objects[0];
+        const relativeObjects: Object[] = [];
+        for (const object of objects) {
+            const stackId = this.getStackId(object);
+            if (stackId === undefined) {
+                relativeObjects.push(new RelativeObject(object, new Location("that is held", this.floorEntity)));
+                continue;
+            }
+            const stackIndex = this.world.stacks[stackId].indexOf(this.getObjectName(object));
+            const belowObject = stackIndex === 0
+                ? this.floor
+                : this.world.objects[this.world.stacks[stackId][stackIndex - 1]];
+            const relation = belowObject.form === "box" ? "inside" : "above";
+            relativeObjects.push(new RelativeObject(object, new Location(relation, new Entity("the", belowObject))));
+        }
+        throw new AmbiguityError(`Did you mean ${ListObjects(relativeObjects)}?`);
     }
 
     /**
