@@ -1,8 +1,8 @@
-
+import {AmbiguityError} from "./AmbiguityError";
 import {interpret} from "./Interpreter";
 import {parse} from "./Parser";
 import {plan} from "./Planner";
-import {ShrdliteResult} from "./Types";
+import {Clarification, ShrdliteResult} from "./Types";
 import {World} from "./World";
 
 /********************************************************************************
@@ -15,6 +15,9 @@ You should do some minor changes to the function 'parseUtteranceIntoPlan',
 look for PLACEHOLDER below.
 Everything else can be left as they are.
 ********************************************************************************/
+
+let Command: ShrdliteResult[] | undefined;
+const Clarifications: Clarification[][] = [];
 
 /**
  * Generic function that takes an utterance and returns a plan. It works according to the following pipeline:
@@ -42,7 +45,8 @@ Everything else can be left as they are.
  *           is either a robot action, like "p" (for pick up) or "r" (for going right),
  *           or a system utterance in English that describes what the robot is doing.
  */
-export function parseUtteranceIntoPlan(world: World, utterance: string): string[] | null {
+// todo add parameter, last request
+export function parseUtteranceIntoPlan(world: World, utterance: string): string[] | null | string {
     let parses;
     let interpretations;
     let plans: string | ShrdliteResult[];
@@ -60,10 +64,26 @@ export function parseUtteranceIntoPlan(world: World, utterance: string): string[
         world.printDebugInfo(`  (${n}) ${result.parse.toString()}`);
     });
 
+    if (parses.some((parse) => parse.parse instanceof Clarification)) {
+        if (Command === undefined) {
+            world.printError("Expected an instruction, please enter a command.");
+            return null;
+        }
+        Clarifications.push(parses.map((parse) => parse.parse as Clarification));
+    } else {
+        Command = parses;
+        Clarifications.length = 0;
+    }
+
     // Call the interpreter for all parses, and then log the interpretations
     try {
-        interpretations = interpret(parses, world.currentState);
+        interpretations = interpret(Command, Clarifications, world.currentState);
+        Command = undefined;
+        Clarifications.length = 0;
     } catch (err) {
+        if (err instanceof AmbiguityError) {
+            return err.message;
+        }
         world.printError("[Interpretation failure]", err);
         return null;
     }
@@ -71,15 +91,6 @@ export function parseUtteranceIntoPlan(world: World, utterance: string): string[
     interpretations.forEach((result, n) => {
         world.printDebugInfo(`  (${n}) ${result.interpretation.toString()}`);
     });
-
-    if (interpretations.length > 1) {
-        // PLACEHOLDER:
-        // several interpretations were found -- how should this be handled?
-        // should we throw an ambiguity error?
-        // ... throw new Error("Ambiguous utterance");
-        // or should we ask the user?
-        // or should we defer the decision until after the planner (below)?
-    }
 
     // Call the planner for all interpretations, and then log the resulting plans
     try {

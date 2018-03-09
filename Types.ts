@@ -23,6 +23,7 @@ export type Command =
       TakeCommand
     | DropCommand
     | MoveCommand
+    | Clarification
 /*
 // Here's an example of a new command
 // Don't forget to add a class definition below
@@ -48,6 +49,12 @@ export class MoveCommand {
                 public location: Location) {}
     public toString(): string {return `MoveCommand(${this.entity.toString()}, ${this.location.toString()})`; }
     public clone(): MoveCommand {return new MoveCommand(this.entity.clone(), this.location.clone()); }
+}
+
+export class Clarification {
+    constructor(public entity: Entity) {}
+    public toString(): string {return `Clarification(${this.entity.toString()})`; }
+    public clone(): Clarification {return new Clarification(this.entity.clone()); }
 }
 
 /*
@@ -95,7 +102,8 @@ export class SimpleObject {
 export type Size = "small" | "large";
 export type Color = "red" | "black" | "blue" | "green" | "yellow" | "white";
 export type Form = "anyform" | "brick" | "plank" | "ball" | "pyramid" | "box" | "table" | "floor";
-export type Relation = "leftof" | "rightof" | "inside" | "ontop" | "under" | "beside" | "above" | "holding";
+export type Relation = "leftof" | "rightof" | "inside" | "ontop" | "under" | "beside" | "above" | "holding"
+    | "at any location";
 //////////////////////////////////////////////////////////////////////
 // Interpretations
 

@@ -12,11 +12,7 @@
 @{%
 import {
     Command, TakeCommand, DropCommand, MoveCommand,
-    /*
-    // Here's an example of a new command
-    // Don't forget to add the corresponding grammar rules below
-    WhereisCommand,
-    */
+    Clarification,
     Location, Entity,
     Object, RelativeObject, SimpleObject,
 } from "./Types";
@@ -24,7 +20,8 @@ import {
 
 ## Grammar rules
 
-main --> will_you:? please:? command please:?  {% (d) => d[2] %}  
+main --> will_you:? please:? command please:?  {% (d) => d[2] %}
+main --> will_you_use:? entityClarification please:? {% (d) => new Clarification(d[1]) %}
 
 command --> take entity           {% (d) => new TakeCommand(d[1]) %}
 command --> move  it    location  {% (d) => new DropCommand(d[2]) %}
@@ -36,10 +33,13 @@ command --> move entity location  {% (d) => new MoveCommand(d[1], d[2]) %}
 # command --> where_is entity       {% (d) => new WhereisCommand(d[1]) %}
 
 location --> relation entity  {% (d) => new Location(d[0], d[1]) %}
+location --> "at" "any" "location" {% (d) => new Location("at any location", new Entity("the", new SimpleObject("floor", null, null))) %}
+location --> "being" "held" {% (d) => new Location("holding", new Entity("the", new SimpleObject("floor", null, null))) %}
 
 entity --> quantifierSG objectSG  {% (d) => new Entity(d[0], d[1]) %}
 entity --> quantifierPL objectPL  {% (d) => new Entity(d[0], d[1]) %}
 entity --> "the" "floor"          {% (d) => new Entity("the", new SimpleObject("floor", null, null)) %}
+entityClarification --> entity    {% (d) => d[0] %}
 
 objectSG --> objectSG that_is:?  location  {% (d) => new RelativeObject(d[0], d[2]) %}
 objectPL --> objectPL that_are:? location  {% (d) => new RelativeObject(d[0], d[2]) %}
@@ -57,9 +57,9 @@ quantifierPL --> ("all")               {% (d) => "all" %}
 relation --> ("left"  "of" | "to" "the" "left"  "of")  {% (d) => "leftof" %}
 relation --> ("right" "of" | "to" "the" "right" "of")  {% (d) => "rightof" %}
 relation --> ("inside" | "in" | "into")  {% (d) => "inside" %}
-relation --> ("on" | "on" "top" "of")    {% (d) => "ontop" %}
+relation --> ("to" | "on" | "on" "top" "of")    {% (d) => "ontop" %}
 relation --> ("under" | "below")         {% (d) => "under" %}
-relation --> ("beside")                  {% (d) => "beside" %}
+relation --> ("beside" | "next" "to")    {% (d) => "beside" %}
 relation --> ("above")                   {% (d) => "above" %}
 
 size --> ("small" | "tiny")  {% (d) => "small" %}
@@ -78,7 +78,7 @@ formPL --> form "s"  {% (d) => d[0] %}
 formSG --> "box"    {% (d) => "box" %}
 formPL --> "boxes"  {% (d) => "box" %}
 
-form --> ("object" | "thing" | "form")  {% (d) => "anyform" %}
+form --> ("object" | "thing" | "form" | "one")  {% (d) => "anyform" %}
 form --> "brick"    {% (d) => "brick" %}
 form --> "plank"    {% (d) => "plank" %}
 form --> "ball"     {% (d) => "ball" %}
@@ -96,6 +96,8 @@ that_is  --> "that" "is"
 that_are --> "that" "are"
 
 will_you --> ("will" | "can" | "could") "you"
+will_you --> "please"
+will_you_use --> will_you "use"
 
 please --> "please"
 

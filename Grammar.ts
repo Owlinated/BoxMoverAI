@@ -1,23 +1,37 @@
-// Generated automatically by nearley
+// Generated automatically by nearley, version 2.13.0
 // http://github.com/Hardmath123/nearley
-function id(d:any[]):any {return d[0];}
+// Bypasses TS6133. Allow declared but unused functions.
+// @ts-ignore
+function id(d: any[]): any { return d[0]; }
 
 import {
     Command, TakeCommand, DropCommand, MoveCommand,
-    /*
-    // Here's an example of a new command
-    // Don't forget to add the corresponding grammar rules below
-    WhereisCommand,
-    */
+    Clarification,
     Location, Entity,
     Object, RelativeObject, SimpleObject,
 } from "./Types";
-export interface Token {value:any; [key: string]:any};
-export interface Lexer {reset:(chunk:string, info:any) => void; next:() => Token | undefined; save:() => any; formatError:(token:Token) => string; has:(tokenType:string) => boolean};
-export interface NearleyRule {name:string; symbols:NearleySymbol[]; postprocess?:(d:any[],loc?:number,reject?:{})=>any};
-export type NearleySymbol = string | {literal:any} | {test:(token:any) => boolean};
-export var Lexer:Lexer|undefined = undefined;
-export var ParserRules:NearleyRule[] = [
+
+export interface Token { value: any; [key: string]: any };
+
+export interface Lexer {
+  reset: (chunk: string, info: any) => void;
+  next: () => Token | undefined;
+  save: () => any;
+  formatError: (token: Token) => string;
+  has: (tokenType: string) => boolean
+};
+
+export interface NearleyRule {
+  name: string;
+  symbols: NearleySymbol[];
+  postprocess?: (d: any[], loc?: number, reject?: {}) => any
+};
+
+export type NearleySymbol = string | { literal: any } | { test: (token: any) => boolean };
+
+export var Lexer: Lexer | undefined = undefined;
+
+export var ParserRules: NearleyRule[] = [
     {"name": "main$ebnf$1", "symbols": ["will_you"], "postprocess": id},
     {"name": "main$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "main$ebnf$2", "symbols": ["please"], "postprocess": id},
@@ -25,15 +39,28 @@ export var ParserRules:NearleyRule[] = [
     {"name": "main$ebnf$3", "symbols": ["please"], "postprocess": id},
     {"name": "main$ebnf$3", "symbols": [], "postprocess": () => null},
     {"name": "main", "symbols": ["main$ebnf$1", "main$ebnf$2", "command", "main$ebnf$3"], "postprocess": (d) => d[2]},
+    {"name": "main$ebnf$4", "symbols": ["will_you_use"], "postprocess": id},
+    {"name": "main$ebnf$4", "symbols": [], "postprocess": () => null},
+    {"name": "main$ebnf$5", "symbols": ["please"], "postprocess": id},
+    {"name": "main$ebnf$5", "symbols": [], "postprocess": () => null},
+    {"name": "main", "symbols": ["main$ebnf$4", "entityClarification", "main$ebnf$5"], "postprocess": (d) => new Clarification(d[1])},
     {"name": "command", "symbols": ["take", "entity"], "postprocess": (d) => new TakeCommand(d[1])},
     {"name": "command", "symbols": ["move", "it", "location"], "postprocess": (d) => new DropCommand(d[2])},
     {"name": "command", "symbols": ["move", "entity", "location"], "postprocess": (d) => new MoveCommand(d[1], d[2])},
     {"name": "location", "symbols": ["relation", "entity"], "postprocess": (d) => new Location(d[0], d[1])},
+    {"name": "location$string$1", "symbols": [{"literal":"a"}, {"literal":"t"}], "postprocess": (d) => d.join('')},
+    {"name": "location$string$2", "symbols": [{"literal":"a"}, {"literal":"n"}, {"literal":"y"}], "postprocess": (d) => d.join('')},
+    {"name": "location$string$3", "symbols": [{"literal":"l"}, {"literal":"o"}, {"literal":"c"}, {"literal":"a"}, {"literal":"t"}, {"literal":"i"}, {"literal":"o"}, {"literal":"n"}], "postprocess": (d) => d.join('')},
+    {"name": "location", "symbols": ["location$string$1", "location$string$2", "location$string$3"], "postprocess": (d) => new Location("at any location", new Entity("the", new SimpleObject("floor", null, null)))},
+    {"name": "location$string$4", "symbols": [{"literal":"b"}, {"literal":"e"}, {"literal":"i"}, {"literal":"n"}, {"literal":"g"}], "postprocess": (d) => d.join('')},
+    {"name": "location$string$5", "symbols": [{"literal":"h"}, {"literal":"e"}, {"literal":"l"}, {"literal":"d"}], "postprocess": (d) => d.join('')},
+    {"name": "location", "symbols": ["location$string$4", "location$string$5"], "postprocess": (d) => new Location("holding", new Entity("the", new SimpleObject("floor", null, null)))},
     {"name": "entity", "symbols": ["quantifierSG", "objectSG"], "postprocess": (d) => new Entity(d[0], d[1])},
     {"name": "entity", "symbols": ["quantifierPL", "objectPL"], "postprocess": (d) => new Entity(d[0], d[1])},
     {"name": "entity$string$1", "symbols": [{"literal":"t"}, {"literal":"h"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
     {"name": "entity$string$2", "symbols": [{"literal":"f"}, {"literal":"l"}, {"literal":"o"}, {"literal":"o"}, {"literal":"r"}], "postprocess": (d) => d.join('')},
     {"name": "entity", "symbols": ["entity$string$1", "entity$string$2"], "postprocess": (d) => new Entity("the", new SimpleObject("floor", null, null))},
+    {"name": "entityClarification", "symbols": ["entity"], "postprocess": (d) => d[0]},
     {"name": "objectSG$ebnf$1", "symbols": ["that_is"], "postprocess": id},
     {"name": "objectSG$ebnf$1", "symbols": [], "postprocess": () => null},
     {"name": "objectSG", "symbols": ["objectSG", "objectSG$ebnf$1", "location"], "postprocess": (d) => new RelativeObject(d[0], d[2])},
@@ -90,12 +117,14 @@ export var ParserRules:NearleyRule[] = [
     {"name": "relation$subexpression$3$string$3", "symbols": [{"literal":"i"}, {"literal":"n"}, {"literal":"t"}, {"literal":"o"}], "postprocess": (d) => d.join('')},
     {"name": "relation$subexpression$3", "symbols": ["relation$subexpression$3$string$3"]},
     {"name": "relation", "symbols": ["relation$subexpression$3"], "postprocess": (d) => "inside"},
-    {"name": "relation$subexpression$4$string$1", "symbols": [{"literal":"o"}, {"literal":"n"}], "postprocess": (d) => d.join('')},
+    {"name": "relation$subexpression$4$string$1", "symbols": [{"literal":"t"}, {"literal":"o"}], "postprocess": (d) => d.join('')},
     {"name": "relation$subexpression$4", "symbols": ["relation$subexpression$4$string$1"]},
     {"name": "relation$subexpression$4$string$2", "symbols": [{"literal":"o"}, {"literal":"n"}], "postprocess": (d) => d.join('')},
-    {"name": "relation$subexpression$4$string$3", "symbols": [{"literal":"t"}, {"literal":"o"}, {"literal":"p"}], "postprocess": (d) => d.join('')},
-    {"name": "relation$subexpression$4$string$4", "symbols": [{"literal":"o"}, {"literal":"f"}], "postprocess": (d) => d.join('')},
-    {"name": "relation$subexpression$4", "symbols": ["relation$subexpression$4$string$2", "relation$subexpression$4$string$3", "relation$subexpression$4$string$4"]},
+    {"name": "relation$subexpression$4", "symbols": ["relation$subexpression$4$string$2"]},
+    {"name": "relation$subexpression$4$string$3", "symbols": [{"literal":"o"}, {"literal":"n"}], "postprocess": (d) => d.join('')},
+    {"name": "relation$subexpression$4$string$4", "symbols": [{"literal":"t"}, {"literal":"o"}, {"literal":"p"}], "postprocess": (d) => d.join('')},
+    {"name": "relation$subexpression$4$string$5", "symbols": [{"literal":"o"}, {"literal":"f"}], "postprocess": (d) => d.join('')},
+    {"name": "relation$subexpression$4", "symbols": ["relation$subexpression$4$string$3", "relation$subexpression$4$string$4", "relation$subexpression$4$string$5"]},
     {"name": "relation", "symbols": ["relation$subexpression$4"], "postprocess": (d) => "ontop"},
     {"name": "relation$subexpression$5$string$1", "symbols": [{"literal":"u"}, {"literal":"n"}, {"literal":"d"}, {"literal":"e"}, {"literal":"r"}], "postprocess": (d) => d.join('')},
     {"name": "relation$subexpression$5", "symbols": ["relation$subexpression$5$string$1"]},
@@ -104,6 +133,9 @@ export var ParserRules:NearleyRule[] = [
     {"name": "relation", "symbols": ["relation$subexpression$5"], "postprocess": (d) => "under"},
     {"name": "relation$subexpression$6$string$1", "symbols": [{"literal":"b"}, {"literal":"e"}, {"literal":"s"}, {"literal":"i"}, {"literal":"d"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
     {"name": "relation$subexpression$6", "symbols": ["relation$subexpression$6$string$1"]},
+    {"name": "relation$subexpression$6$string$2", "symbols": [{"literal":"n"}, {"literal":"e"}, {"literal":"x"}, {"literal":"t"}], "postprocess": (d) => d.join('')},
+    {"name": "relation$subexpression$6$string$3", "symbols": [{"literal":"t"}, {"literal":"o"}], "postprocess": (d) => d.join('')},
+    {"name": "relation$subexpression$6", "symbols": ["relation$subexpression$6$string$2", "relation$subexpression$6$string$3"]},
     {"name": "relation", "symbols": ["relation$subexpression$6"], "postprocess": (d) => "beside"},
     {"name": "relation$subexpression$7$string$1", "symbols": [{"literal":"a"}, {"literal":"b"}, {"literal":"o"}, {"literal":"v"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
     {"name": "relation$subexpression$7", "symbols": ["relation$subexpression$7$string$1"]},
@@ -142,6 +174,8 @@ export var ParserRules:NearleyRule[] = [
     {"name": "form$subexpression$1", "symbols": ["form$subexpression$1$string$2"]},
     {"name": "form$subexpression$1$string$3", "symbols": [{"literal":"f"}, {"literal":"o"}, {"literal":"r"}, {"literal":"m"}], "postprocess": (d) => d.join('')},
     {"name": "form$subexpression$1", "symbols": ["form$subexpression$1$string$3"]},
+    {"name": "form$subexpression$1$string$4", "symbols": [{"literal":"o"}, {"literal":"n"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
+    {"name": "form$subexpression$1", "symbols": ["form$subexpression$1$string$4"]},
     {"name": "form", "symbols": ["form$subexpression$1"], "postprocess": (d) => "anyform"},
     {"name": "form$string$1", "symbols": [{"literal":"b"}, {"literal":"r"}, {"literal":"i"}, {"literal":"c"}, {"literal":"k"}], "postprocess": (d) => d.join('')},
     {"name": "form", "symbols": ["form$string$1"], "postprocess": (d) => "brick"},
@@ -182,7 +216,12 @@ export var ParserRules:NearleyRule[] = [
     {"name": "will_you$subexpression$1", "symbols": ["will_you$subexpression$1$string$3"]},
     {"name": "will_you$string$1", "symbols": [{"literal":"y"}, {"literal":"o"}, {"literal":"u"}], "postprocess": (d) => d.join('')},
     {"name": "will_you", "symbols": ["will_you$subexpression$1", "will_you$string$1"]},
+    {"name": "will_you$string$2", "symbols": [{"literal":"p"}, {"literal":"l"}, {"literal":"e"}, {"literal":"a"}, {"literal":"s"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
+    {"name": "will_you", "symbols": ["will_you$string$2"]},
+    {"name": "will_you_use$string$1", "symbols": [{"literal":"u"}, {"literal":"s"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
+    {"name": "will_you_use", "symbols": ["will_you", "will_you_use$string$1"]},
     {"name": "please$string$1", "symbols": [{"literal":"p"}, {"literal":"l"}, {"literal":"e"}, {"literal":"a"}, {"literal":"s"}, {"literal":"e"}], "postprocess": (d) => d.join('')},
     {"name": "please", "symbols": ["please$string$1"]}
 ];
-export var ParserStart:string = "main";
+
+export var ParserStart: string = "main";

@@ -54,9 +54,14 @@ function interactiveLoop(world: World): void {
         const inputPrompt = "What can I do for you today? ";
         const nextInput = () => world.readUserInput(inputPrompt, endlessLoop);
         if (utterance.trim()) {
-            let theplan: string[] | null = splitStringIntoPlan(utterance);
+            let theplan: string[] | null | string = splitStringIntoPlan(utterance);
             if (!theplan) {
+                // Need clarification, outputs question
                 theplan = parseUtteranceIntoPlan(world, utterance);
+                if (typeof theplan === "string") {
+                    world.readUserInput(theplan, endlessLoop);
+                    return;
+                }
             }
             if (theplan) {
                 world.printDebugInfo("Plan: " + theplan.join(", "));
@@ -88,7 +93,7 @@ function goodbye(event: any) {
         event.preventDefault();
     }
 }
-window.onbeforeunload = goodbye;
+// window.onbeforeunload = goodbye;
 
 /**
  * This function gets the URL parameter value for a given key all parameters in the URL string,
