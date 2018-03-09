@@ -34,6 +34,7 @@ command --> move entity location  {% (d) => new MoveCommand(d[1], d[2]) %}
 
 location --> relation entity  {% (d) => new Location(d[0], d[1]) %}
 location --> "at" "any" "location" {% (d) => new Location("at any location", new Entity("the", new SimpleObject("floor", null, null))) %}
+location --> "being" "held" {% (d) => new Location("holding", new Entity("the", new SimpleObject("floor", null, null))) %}
 
 entity --> quantifierSG objectSG  {% (d) => new Entity(d[0], d[1]) %}
 entity --> quantifierPL objectPL  {% (d) => new Entity(d[0], d[1]) %}
@@ -56,9 +57,9 @@ quantifierPL --> ("all")               {% (d) => "all" %}
 relation --> ("left"  "of" | "to" "the" "left"  "of")  {% (d) => "leftof" %}
 relation --> ("right" "of" | "to" "the" "right" "of")  {% (d) => "rightof" %}
 relation --> ("inside" | "in" | "into")  {% (d) => "inside" %}
-relation --> ("on" | "on" "top" "of")    {% (d) => "ontop" %}
+relation --> ("to" | "on" | "on" "top" "of")    {% (d) => "ontop" %}
 relation --> ("under" | "below")         {% (d) => "under" %}
-relation --> ("beside")                  {% (d) => "beside" %}
+relation --> ("beside" | "next" "to")    {% (d) => "beside" %}
 relation --> ("above")                   {% (d) => "above" %}
 
 size --> ("small" | "tiny")  {% (d) => "small" %}

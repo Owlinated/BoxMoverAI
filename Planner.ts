@@ -86,6 +86,10 @@ class Planner {
     }
 
     private checkGoalLiteral(node: ShrdliteNode, literal: Literal) {
+        if (literal.relation === "at any location") {
+            return true;
+        }
+
         if (literal.relation === "holding") {
             if (literal.args.length !== 1) {
                 throw new Error("Literal needs exactly one argument");
@@ -243,6 +247,8 @@ class Planner {
                 /* falls through */
                 case "holding":
                     heuristic += Math.abs(posB - posA);
+                    break;
+                case "at any location":
                     break;
                 default:
                     throw new Error(`Unknown relation: ${literal.relation}`);

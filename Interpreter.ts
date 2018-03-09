@@ -87,6 +87,8 @@ export function interpret(
             ambiguousObjects.push({parse, entity: parse.parse.entity});
         } else if (parse.parse instanceof TakeCommand) {
             ambiguousObjects.push({parse, entity: parse.parse.entity});
+        } else if (parse.parse instanceof DropCommand) {
+            // There cannot be any ambiguities in drops
         } else {
             throw Error(`Unexpected ambiguity in ${parse}`);
         }
@@ -161,11 +163,13 @@ function ListObjects(objects: Object[]): string {
     }
     const grouped = GroupBy(objects, (object) => GetSimple(object).form);
     const keys = Object.keys(grouped);
-    /*if (keys.length === 1) {
-        return `the ${ListObjectsByColor((grouped as any)[keys[0]], "one")}`;
-    }*/
     const terms = keys.map((key) => `${ListObjectsByColor((grouped as any)[key], key === "anyform" ? "object" : key)}`);
-    return StringOrJoin(terms);
+    const result = StringOrJoin(terms);
+
+    if (keys.length === 1 && result === "the " + keys[0]) {
+        throw new AmbiguityError(`Found similar objects. Please describe your ${keys[0]}.`);
+    }
+    return result;
 }
 
 function ListObjectsByColor(objects: Object[], description: string): string {
@@ -208,14 +212,17 @@ function ListObjectsByLocation(objects: Object[], description: string): string {
     if (keys.length === 1) {
         return description;
     }
+
     const terms = keys.map((key) => key === "undefined" ? "at any location" : key);
     return `${description} ${terms.join(" or the one ")}`;
 }
 
 function DescribeLocation(location: Location): string {
-    const clarifications: string[] = ["that is held", "at any location"];
-    if (clarifications.indexOf(location.relation) >= 0) {
+    if (location.relation === "at any location") {
         return location.relation;
+    }
+    if (location.relation === "holding") {
+        return "being held";
     }
     return `that is ${location.relation} ${DescribeEntity(location.entity)}`;
 }
@@ -280,6 +287,18 @@ class Interpreter {
 
     public interpretCommand(cmd: Command, clarifications: Clarification[][]): DNFFormula {
         const result = Interpreter.interpretCommandInternal(cmd, clarifications, this.world);
+
+        // Remove all self referencing literals
+        const filteredConjunctions: Conjunction[] = [];
+        for (const conjunction of result.conjuncts) {
+            const filteredDisjunction = conjunction.literals.filter((literal) =>
+                (literal.args.length !== 2) || (literal.args[0] !== literal.args[1]));
+            if (filteredDisjunction.length > 0) {
+                filteredConjunctions.push(new Conjunction(filteredDisjunction));
+            }
+        }
+        result.conjuncts = filteredConjunctions;
+
         if (result.conjuncts.length === 0) {
             throw new Error("Can not interpret command");
         }
@@ -292,7 +311,8 @@ class Interpreter {
      * @returns: A DNFFormula representing the interpretation of the user's command.
      *           If there's an interpretation error, it throws an error with a string description.
      */
-    public static interpretCommandInternal(cmd: Command, clarifications: Clarification[][], world: WorldState): DNFFormula {
+    public static interpretCommandInternal(cmd: Command, clarifications: Clarification[][], world: WorldState)
+        : DNFFormula {
         if (cmd instanceof MoveCommand) {
             const entity = Interpreter.interpretEntity(cmd.entity, clarifications, world);
             const location = Interpreter.interpretLocation(cmd.location, clarifications, world);
@@ -534,7 +554,7 @@ class Interpreter {
         for (const object of objects) {
             const stackId = Interpreter.getStackId(object, world);
             if (stackId === undefined) {
-                relativeObjects.push(new RelativeObject(object, new Location("that is held", Interpreter.floorEntity)));
+                relativeObjects.push(new RelativeObject(object, new Location("holding", Interpreter.floorEntity)));
                 continue;
             }
             const stackIndex = world.stacks[stackId].indexOf(Interpreter.getObjectName(object, world));
@@ -558,8 +578,8 @@ class Interpreter {
             return false;
         }
 
-        // Check holding separately
-        if (literal.relation === "holding") {
+        // Check holding & any location separately
+        if (literal.relation === "holding" || literal.relation === "at any location") {
             return true;
         }
 
@@ -570,7 +590,7 @@ class Interpreter {
         const objectA = Interpreter.getObject(literal.args[0], world);
         const objectB = Interpreter.getObject(literal.args[1], world);
         if (objectA === objectB) {
-            return false;
+            return true;
         }
 
         // Apply rules specific to relations
@@ -698,8 +718,16 @@ class Interpreter {
      */
     public static matchLocation(filter: LocationSemantics, object: SimpleObject, world: WorldState): boolean {
         const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
-            // todo handle any location & picked up location
+            if (filter.relation === "at any location") {
+                return true;
+            }
+            if (objectA === objectB) {
+                return true;
+            }
             const stackA = Interpreter.getStackId(objectA, world);
+            if (filter.relation === "holding") {
+                return stackA === undefined;
+            }
             const stackB = Interpreter.getStackId(objectB, world);
             if ((stackA === undefined && objectA !== Interpreter.floor)
                 || (stackB === undefined && objectB !== Interpreter.floor)) {

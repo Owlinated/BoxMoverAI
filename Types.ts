@@ -103,8 +103,7 @@ export type Size = "small" | "large";
 export type Color = "red" | "black" | "blue" | "green" | "yellow" | "white";
 export type Form = "anyform" | "brick" | "plank" | "ball" | "pyramid" | "box" | "table" | "floor";
 export type Relation = "leftof" | "rightof" | "inside" | "ontop" | "under" | "beside" | "above" | "holding"
-    | ClarificationRelation;
-export type ClarificationRelation = "at any location" | "that is held";
+    | "at any location";
 //////////////////////////////////////////////////////////////////////
 // Interpretations
 
