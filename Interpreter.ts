@@ -1,4 +1,5 @@
 import {AmbiguityError} from "./AmbiguityError";
+import Dictionary from "./lib/typescript-collections/src/lib/Dictionary";
 import {World, WorldState} from "./World";
 
 import {
@@ -88,7 +89,14 @@ export function interpret(
         } else if (parse.parse instanceof TakeCommand) {
             ambiguousObjects.push({parse, entity: parse.parse.entity});
         } else if (parse.parse instanceof DropCommand) {
-            // There cannot be any ambiguities in drops
+            // Describe the object being held in terms of an entity
+            ambiguousObjects.push({parse, entity:
+                    new Entity("the",
+                        new RelativeObject(
+                            new SimpleObject("anyform", null, null),
+                            new Location("holding",
+                                new Entity("the",
+                                    new SimpleObject("anyform", null, null)))))});
         } else {
             throw Error(`Unexpected ambiguity in ${parse}`);
         }
@@ -285,8 +293,14 @@ class Interpreter {
     public static floor = new SimpleObject("floor", null, null);
     public static floorEntity = new Entity("the", Interpreter.floor);
 
+    /**
+     * Cache for entities, to avoid duplicate amiguity resolutions
+     */
+    private static entityCache = new Dictionary<string, EntitySemantics>();
+
     public interpretCommand(cmd: Command, clarifications: Clarification[][]): DNFFormula {
         const result = Interpreter.interpretCommandInternal(cmd, clarifications, this.world);
+        Interpreter.entityCache.clear();
 
         // Remove all self referencing literals
         const filteredConjunctions: Conjunction[] = [];
@@ -314,7 +328,7 @@ class Interpreter {
     public static interpretCommandInternal(cmd: Command, clarifications: Clarification[][], world: WorldState)
         : DNFFormula {
         if (cmd instanceof MoveCommand) {
-            const entity = Interpreter.interpretEntity(cmd.entity, clarifications, world);
+            const entity = Interpreter.interpretEntityCached(cmd.entity, clarifications, world);
             const location = Interpreter.interpretLocation(cmd.location, clarifications, world);
 
             if (location.entity.junction === Junction.Conjunction) {
@@ -408,7 +422,7 @@ class Interpreter {
             }
         } else if (cmd instanceof TakeCommand) {
             // We cannot pick up more than one object at a time
-            const entity = Interpreter.interpretEntity(cmd.entity, clarifications, world);
+            const entity = Interpreter.interpretEntityCached(cmd.entity, clarifications, world);
             if (entity.junction === Junction.Conjunction && entity.objects.length > 1) {
                 return new DNFFormula([]);
             }
@@ -462,8 +476,19 @@ class Interpreter {
      */
     public static interpretLocation(location: Location, clarifications: Clarification[][], world: WorldState)
         : LocationSemantics {
-        const entity = Interpreter.interpretEntity(location.entity, clarifications, world);
+        const entity = Interpreter.interpretEntityCached(location.entity, clarifications, world);
         return {relation: location.relation, entity};
+    }
+
+    public static interpretEntityCached(ent: Entity, clarifications: Clarification[][], world: WorldState)
+        : EntitySemantics {
+        const key = ent.toString();
+        if (this.entityCache.containsKey(key)) {
+            return this.entityCache.getValue(key)!;
+        }
+        const result = this.interpretEntity(ent, clarifications, world);
+        this.entityCache.setValue(key, result);
+        return result;
     }
 
     /**
@@ -589,9 +614,6 @@ class Interpreter {
         }
         const objectA = Interpreter.getObject(literal.args[0], world);
         const objectB = Interpreter.getObject(literal.args[1], world);
-        if (objectA === objectB) {
-            return true;
-        }
 
         // Apply rules specific to relations
         switch (literal.relation) {
@@ -719,9 +741,6 @@ class Interpreter {
     public static matchLocation(filter: LocationSemantics, object: SimpleObject, world: WorldState): boolean {
         const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
             if (filter.relation === "at any location") {
-                return true;
-            }
-            if (objectA === objectB) {
                 return true;
             }
             const stackA = Interpreter.getStackId(objectA, world);
