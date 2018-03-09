@@ -23,6 +23,7 @@ export type Command =
       TakeCommand
     | DropCommand
     | MoveCommand
+    | Clarification
 /*
 // Here's an example of a new command
 // Don't forget to add a class definition below
@@ -51,9 +52,9 @@ export class MoveCommand {
 }
 
 export class Clarification {
-    constructor(public object: Entity) {}
-    public toString(): string {return `Clarification(${this.object.toString()})`; }
-    public clone(): Clarification {return new Clarification(this.object.clone()); }
+    constructor(public entity: Entity) {}
+    public toString(): string {return `Clarification(${this.entity.toString()})`; }
+    public clone(): Clarification {return new Clarification(this.entity.clone()); }
 }
 
 /*

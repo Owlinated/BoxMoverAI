@@ -33,6 +33,7 @@ command --> move entity location  {% (d) => new MoveCommand(d[1], d[2]) %}
 # command --> where_is entity       {% (d) => new WhereisCommand(d[1]) %}
 
 location --> relation entity  {% (d) => new Location(d[0], d[1]) %}
+location --> "at" "any" "location" {% (d) => new Location("at any location", new Entity("the", new SimpleObject("floor", null, null))) %}
 
 entity --> quantifierSG objectSG  {% (d) => new Entity(d[0], d[1]) %}
 entity --> quantifierPL objectPL  {% (d) => new Entity(d[0], d[1]) %}
@@ -94,6 +95,7 @@ that_is  --> "that" "is"
 that_are --> "that" "are"
 
 will_you --> ("will" | "can" | "could") "you"
+will_you --> "please"
 will_you_use --> will_you "use"
 
 please --> "please"

@@ -2,6 +2,7 @@ import {AmbiguityError} from "./AmbiguityError";
 import {World, WorldState} from "./World";
 
 import {
+    Clarification,
     Command,
     Conjunction, DNFFormula, DropCommand, Entity,
     Literal, Location,
@@ -50,60 +51,107 @@ import * as util from "./lib/typescript-collections/src/lib/util";
  */
 export function interpret(
     parses: ShrdliteResult[],
-    clarifications: ShrdliteResult[][],
+    clarifications: Clarification[][],
     world: WorldState): ShrdliteResult[] {
+    // Make a copy of clarifications
+    clarifications = clarifications.slice();
 
     const errors: Error[] = [];
     const interpretations: ShrdliteResult[] = [];
-    const ambiguousParses: ShrdliteResult[] = [];
+    const possibleParses: ShrdliteResult[] = [];
     const interpreter: Interpreter = new Interpreter(world);
 
     for (const parse of parses) {
         console.log(parse);
         try {
-            const intp: DNFFormula = interpreter.interpretCommand(parse.parse);
-            ambiguousParses.push(parse);
+            const intp: DNFFormula = interpreter.interpretCommand(parse.parse, []);
+            possibleParses.push(parse);
             parse.interpretation = intp;
             interpretations.push(parse);
         } catch (err) {
             if (err instanceof AmbiguityError) {
-                ambiguousParses.push(parse);
+                possibleParses.push(parse);
             }
             errors.push(err);
         }
     }
 
-    if (interpretations.length === 1) {
-        return interpretations;
-    }
-
-    if (ambiguousParses.length === 0) {
+    if (possibleParses.length === 0) {
         // merge all errors into one
         throw errors.join(" ; ");
     }
 
-    const ambiguousObjects: Array<{parse: ShrdliteResult, entity: Object}> = [];
-    for (const parse of ambiguousParses) {
+    let ambiguousObjects: Array<{parse: ShrdliteResult, entity: Entity}> = [];
+    for (const parse of possibleParses) {
         if (parse.parse instanceof MoveCommand) {
-            ambiguousObjects.push({parse, entity: parse.parse.entity.object});
+            ambiguousObjects.push({parse, entity: parse.parse.entity});
         } else if (parse.parse instanceof TakeCommand) {
-            ambiguousObjects.push({parse, entity: parse.parse.entity.object});
+            ambiguousObjects.push({parse, entity: parse.parse.entity});
         } else {
             throw Error(`Unexpected ambiguity in ${parse}`);
         }
     }
 
     while (ambiguousObjects.length > 1 && clarifications.length > 0) {
+        const clarification = clarifications.splice(0, 1)[0];
+        ambiguousObjects = ambiguousObjects.filter((object) =>
+            clarification.some((clar) =>
+                isObjectMatch((clar as Clarification).entity.object, object.entity.object)));
+    }
 
+    if (ambiguousObjects.length === 0) {
+        throw new Error("No interpretation matches your clarifications.");
     }
 
     if (ambiguousObjects.length <= 1) {
         const result = ambiguousObjects[0].parse;
-        result.interpretation = interpreter.interpretCommand(result.parse);
+        result.interpretation = interpreter.interpretCommand(result.parse, clarifications);
+        return [result];
     }
 
-    const objectsDescription = ListObjects(ambiguousObjects.map((parse) => parse.entity));
+    const objectsDescription = ListObjects(ambiguousObjects.map((parse) => parse.entity.object));
     throw new AmbiguityError(`Do you want me to move ${objectsDescription}?`);
+}
+
+function isEntityMatch(filter: Entity, entity: Entity): boolean {
+    if (entity.quantifier !== filter.quantifier) {
+        return false;
+    }
+    return isObjectMatch(filter.object, entity.object);
+}
+
+function isObjectMatch(filter: Object, object: Object): boolean {
+    if (filter instanceof SimpleObject) {
+        object = GetSimple(object);
+        if (filter.form !== "anyform" && object.form !== filter.form) {
+            return false;
+        }
+        if (filter.color !== null && object.color !== filter.color) {
+            return false;
+        }
+        if (filter.size !== null && object.size !== filter.size) {
+            return false;
+        }
+        return true;
+    } else {
+        if (filter.location.relation === "at any location") {
+            if (object instanceof RelativeObject) {
+                return false;
+            }
+            return isObjectMatch(filter.object, object);
+        }
+        if (object instanceof SimpleObject) {
+            return false;
+        }
+        return isLocationMatch(filter.location, object.location) && isObjectMatch(filter.object, object.object);
+    }
+}
+
+function isLocationMatch(filter: Location, location: Location) : boolean {
+    if (location.relation !== filter.relation) {
+        return false;
+    }
+    return isEntityMatch(filter.entity, location.entity);
 }
 
 // By Form
@@ -116,7 +164,7 @@ function ListObjects(objects: Object[]): string {
     /*if (keys.length === 1) {
         return `the ${ListObjectsByColor((grouped as any)[keys[0]], "one")}`;
     }*/
-    const terms = keys.map((key) => `${ListObjectsByColor((grouped as any)[key], key)}`);
+    const terms = keys.map((key) => `${ListObjectsByColor((grouped as any)[key], key === "anyform" ? "object" : key)}`);
     return StringOrJoin(terms);
 }
 
@@ -130,7 +178,8 @@ function ListObjectsByColor(objects: Object[], description: string): string {
         return ListObjectsBySize((grouped as any)[keys[0]], description);
     }
     const terms = keys.map((key) =>
-        ListObjectsBySize((grouped as any)[key], `${key === "undefined" ? "any color" : key} ${description}`));
+        ListObjectsBySize((grouped as any)[key],
+            `${key === "undefined" ? "any color" : key} ${description}`));
     return ` ${StringOrJoin(terms)}`;
 }
 
@@ -188,7 +237,7 @@ function DescribeObject(object: Object): string {
 function DescribeSimpleObject(object: SimpleObject): string {
     return (object.size === null ? "" : object.size + " ")
         + (object.color === null ? "" : object.color + " ")
-        + object.form;
+        + (object.form === "anyform" ? "object" : object.form);
 }
 
 function StringOrJoin(strings: string[]): string {
@@ -229,8 +278,8 @@ class Interpreter {
     public static floor = new SimpleObject("floor", null, null);
     public static floorEntity = new Entity("the", Interpreter.floor);
 
-    public interpretCommand(cmd: Command): DNFFormula {
-        const result = Interpreter.interpretCommandInternal(cmd, this.world);
+    public interpretCommand(cmd: Command, clarifications: Clarification[][]): DNFFormula {
+        const result = Interpreter.interpretCommandInternal(cmd, clarifications, this.world);
         if (result.conjuncts.length === 0) {
             throw new Error("Can not interpret command");
         }
@@ -243,10 +292,10 @@ class Interpreter {
      * @returns: A DNFFormula representing the interpretation of the user's command.
      *           If there's an interpretation error, it throws an error with a string description.
      */
-    public static interpretCommandInternal(cmd: Command, world: WorldState): DNFFormula {
+    public static interpretCommandInternal(cmd: Command, clarifications: Clarification[][], world: WorldState): DNFFormula {
         if (cmd instanceof MoveCommand) {
-            const entity = Interpreter.interpretEntity(cmd.entity, world);
-            const location = Interpreter.interpretLocation(cmd.location, world);
+            const entity = Interpreter.interpretEntity(cmd.entity, clarifications, world);
+            const location = Interpreter.interpretLocation(cmd.location, clarifications, world);
 
             if (location.entity.junction === Junction.Conjunction) {
                 if (entity.junction === Junction.Conjunction) {
@@ -339,7 +388,7 @@ class Interpreter {
             }
         } else if (cmd instanceof TakeCommand) {
             // We cannot pick up more than one object at a time
-            const entity = Interpreter.interpretEntity(cmd.entity, world);
+            const entity = Interpreter.interpretEntity(cmd.entity, clarifications, world);
             if (entity.junction === Junction.Conjunction && entity.objects.length > 1) {
                 return new DNFFormula([]);
             }
@@ -358,7 +407,7 @@ class Interpreter {
                 return new DNFFormula([]);
             }
 
-            const location = Interpreter.interpretLocation(cmd.location, world);
+            const location = Interpreter.interpretLocation(cmd.location, clarifications, world);
             if (location.entity.junction === Junction.Conjunction) {
                 // One big conjunction term with all constraints
                 const conjunction: Literal[] = [];
@@ -391,8 +440,9 @@ class Interpreter {
      * @param {Location} location: The location as parsed by the grammar
      * @returns {LocationSemantics} The location to build a DNF from
      */
-    public static interpretLocation(location: Location, world: WorldState): LocationSemantics {
-        const entity = Interpreter.interpretEntity(location.entity, world);
+    public static interpretLocation(location: Location, clarifications: Clarification[][], world: WorldState)
+        : LocationSemantics {
+        const entity = Interpreter.interpretEntity(location.entity, clarifications, world);
         return {relation: location.relation, entity};
     }
 
@@ -401,17 +451,24 @@ class Interpreter {
      * @param {Entity} ent: The entity as parsed by the grammar
      * @returns {EntitySemantics}: The entity to build a DNF from
      */
-    public static interpretEntity(ent: Entity, world: WorldState): EntitySemantics {
+    public static interpretEntity(ent: Entity, clarifications: Clarification[][], world: WorldState): EntitySemantics {
         switch (ent.quantifier) {
             case "any":
                 // Return all possible objects and tell caller to pick any of them
-                return {junction: Junction.Disjunction, objects: Interpreter.getObjects(ent.object, world)};
+                return {
+                    junction: Junction.Disjunction,
+                    objects: Interpreter.getObjects(ent.object, clarifications, world)
+                };
             case "all":
                 // Return all possible object and tell caller to match all of them
-                return {junction: Junction.Conjunction, objects: Interpreter.getObjects(ent.object, world)};
+                return {
+                    junction: Junction.Conjunction,
+                    objects: Interpreter.getObjects(ent.object, clarifications, world)
+                };
             case "the":
                 // Find a single object matching the description and resolve ambiguities
-                const result = Interpreter.resolveAmbiguity(Interpreter.getObjects(ent.object, world), world);
+                const result = Interpreter.resolveAmbiguity(
+                    Interpreter.getObjects(ent.object, clarifications, world), clarifications, world);
                 return {junction: Junction.Conjunction, objects: [result]};
             default:
                 throw new Error(`Unknown quantifier: ${ent.quantifier}`);
@@ -420,26 +477,35 @@ class Interpreter {
 
     /**
      * Get all objects within the world, that match the properties of the filter object
-     * @param {Object} filterObject The object used to filter by
+     * @param {Object} filter The object used to filter by
      * @returns {SimpleObject[]} List of all matching simple objects
      */
-    public static getObjects(filterObject: Object, world: WorldState): SimpleObject[] {
-        if (filterObject instanceof SimpleObject) {
-            let result = Interpreter.getSimpleObjects(world);
-            if (filterObject.form !== "anyform") {
-                result = result.filter((simpleObj) => simpleObj.form === filterObject.form);
+    public static getObjects(filter: Object, clarifications: Clarification[][], world: WorldState): SimpleObject[] {
+        return Interpreter.getSimpleObjects(world).filter((object) =>
+            Interpreter.matchObject(filter, object, clarifications, world));
+    }
+
+    /**
+     * Filter objects by matching the properties of the filter object
+     * @param {Object} filter The object used to filter by
+     * @returns {SimpleObject[]} List of all matching simple objects
+     */
+    public static matchObject(filter: Object, object: SimpleObject, clarifications: Clarification[][], world: WorldState): boolean {
+        if (filter instanceof SimpleObject) {
+            if (filter.form !== "anyform" && object.form !== filter.form) {
+                return false;
             }
-            if (filterObject.color !== null) {
-                result = result.filter((simpleObj) => simpleObj.color === filterObject.color);
+            if (filter.color !== null && object.color !== filter.color) {
+                return false;
             }
-            if (filterObject.size !== null) {
-                result = result.filter((simpleObj) => simpleObj.size === filterObject.size);
+            if (filter.size !== null && object.size !== filter.size) {
+                return false;
             }
-            return result;
+            return true;
         } else {
-            const result = Interpreter.getObjects(filterObject.object, world);
-            const location = Interpreter.interpretLocation(filterObject.location, world);
-            return Interpreter.filterObjectsByLocation(result, location, world);
+            const location = Interpreter.interpretLocation(filter.location, clarifications, world);
+            return Interpreter.matchLocation(location, object, world)
+                && Interpreter.matchObject(filter.object, object, clarifications, world);
         }
     }
 
@@ -448,11 +514,22 @@ class Interpreter {
      * @param {SimpleObject[]} objects: Possible objects
      * @returns {SimpleObject} The object desired by the user
      */
-    public static resolveAmbiguity(objects: SimpleObject[], world: WorldState): SimpleObject {
-        // todo actually use clarification
+    public static resolveAmbiguity(objects: SimpleObject[], clarifications: Clarification[][], world: WorldState)
+        : SimpleObject {
+        while (objects.length > 1 && clarifications.length > 0) {
+            const clarification = clarifications.splice(0, 1)[0];
+            objects = objects.filter((object) =>
+                clarification.some((clar) => this.matchObject(clar.entity.object, object, clarifications, world)));
+        }
+
+        if (objects.length === 0) {
+            throw new Error("No objects to choose from");
+        }
+
         if (objects.length === 1) {
             return objects[0];
         }
+
         const relativeObjects: Object[] = [];
         for (const object of objects) {
             const stackId = Interpreter.getStackId(object, world);
@@ -616,33 +693,24 @@ class Interpreter {
     /**
      * Interpret a location consisting of a relation to an entity
      * @param {SimpleObject[]} objects: Objects to filter by location
-     * @param {Location} filterLocation: The location as parsed by the grammar
+     * @param {Location} filter: The location as parsed by the grammar
      * @returns {LocationSemantics} The objects that are in the described location
      */
-    public static filterObjectsByLocation(objects: SimpleObject[],
-                                           filterLocation: LocationSemantics,
-                                           world: WorldState): SimpleObject[] {
-        const result: SimpleObject[] = [];
-
-        for (const object of objects) {
-            const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
-                const stackA = Interpreter.getStackId(objectA, world);
-                const stackB = Interpreter.getStackId(objectB, world);
-                if ((stackA === undefined && objectA !== Interpreter.floor)
-                    || (stackB === undefined && objectB !== Interpreter.floor)) {
-                    return false;
-                }
-                return Interpreter.relationTesters[filterLocation.relation](objectA, stackA, objectB, stackB, world);
-            };
-            const isInRelation = filterLocation.entity.junction === Junction.Conjunction
-                ? filterLocation.entity.objects.every((locationObject) => relationTester(object, locationObject))
-                : filterLocation.entity.objects.some((locationObject) => relationTester(object, locationObject));
-            if (isInRelation) {
-                result.push(object);
+    public static matchLocation(filter: LocationSemantics, object: SimpleObject, world: WorldState): boolean {
+        const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
+            // todo handle any location & picked up location
+            const stackA = Interpreter.getStackId(objectA, world);
+            const stackB = Interpreter.getStackId(objectB, world);
+            if ((stackA === undefined && objectA !== Interpreter.floor)
+                || (stackB === undefined && objectB !== Interpreter.floor)) {
+                return false;
             }
-        }
+            return Interpreter.relationTesters[filter.relation](objectA, stackA, objectB, stackB, world);
+        };
 
-        return result;
+        return filter.entity.junction === Junction.Conjunction
+            ? filter.entity.objects.every((locationObject) => relationTester(object, locationObject))
+            : filter.entity.objects.some((locationObject) => relationTester(object, locationObject));
     }
 
     /**
