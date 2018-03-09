@@ -1,7 +1,6 @@
-
 import {aStarSearch} from "./AStarSearch";
 import {Graph, SearchResult, Successor} from "./Graph";
-import {DNFFormula, Literal, ShrdliteResult} from "./Types";
+import {Conjunction, DNFFormula, Literal, ShrdliteResult, SimpleObject} from "./Types";
 import {WorldState} from "./World";
 
 /*
@@ -11,13 +10,7 @@ import {WorldState} from "./World";
  * produced by the Interpreter module and to plan a sequence of
  * actions for the robot to put the world into a state compatible
  * with the user's command, i.e. to achieve what the user wanted.
- *
- * You should implement the function 'makePlan'.
- * The planner should use your A* search implementation to find a plan.
  */
-
-//////////////////////////////////////////////////////////////////////
-// exported functions, classes and interfaces/types
 
 /**
  * Top-level driver for the Planner.
@@ -53,17 +46,14 @@ export function plan(interpretations: ShrdliteResult[], world: WorldState): Shrd
     return plans;
 }
 
-/*
- * The core planner class.
- * The code here are just templates; you should rewrite this class entirely.
- * In this template, the code produces a dummy plan which is not connected
- * to the argument 'interpretation'. Your version of the class should
- * analyse 'interpretation' in order to figure out what plan to return.
- */
 class Planner {
-    constructor(
-        private world: WorldState,
-    ) {}
+    constructor(private world: WorldState) {
+    }
+
+    /**
+     * Floor of world
+     */
+    private floor = new SimpleObject("floor", null, null);
 
     /**
      * The core planner method.
@@ -76,94 +66,345 @@ class Planner {
      *           If there's a planning error, it throws an error with a string description.
      */
     public makePlan(interpretation: DNFFormula): string[] {
-        // This currently returns a dummy plan which picks up a random object
-        // and moves it around before dropping it down.
-        const state = this.world;
-        const plan: string[] = [];
-
-        // Select a random nonempty stack
-        let pickstack: number;
-        do {
-            pickstack = Math.floor(Math.random() * state.stacks.length);
-        } while (state.stacks[pickstack].length === 0);
-
-        // First move the arm to the selected stack
-        if (pickstack < state.arm) {
-            plan.push("Moving left to stack " + pickstack);
-            for (let i = state.arm; i > pickstack; i--) {
-                plan.push("l");
-            }
-        } else if (pickstack > state.arm) {
-            plan.push("Moving right to stack " + pickstack);
-            for (let i = state.arm; i < pickstack; i++) {
-                plan.push("r");
-            }
-        }
-
-        // Then pick up the topmost object in the selected stack
-        const obj = state.stacks[pickstack][state.stacks[pickstack].length - 1];
-        plan.push("Picking up the " + state.objects[obj].form,
-                  "p");
-
-        if (pickstack > 0) {
-            // Then move the arm to the leftmost stack
-            plan.push("Moving as far left as possible");
-            for (let i = pickstack; i > 0; i--) {
-                plan.push("l");
-            }
-        }
-
-        // Select a random destination stack (either empty or the original pickup stack)
-        let dropstack: number;
-        do {
-            dropstack = Math.floor(Math.random() * state.stacks.length);
-        } while (!(state.stacks[dropstack].length === 0 || dropstack === pickstack));
-
-        if (dropstack > 0) {
-            // Then move the arm to the destination stack
-            plan.push("Moving right to the destination stack " + dropstack);
-            for (let i = 0; i < dropstack; i++) {
-                plan.push("r");
-            }
-        }
-
-        // Finally put the object down again
-        plan.push("Dropping the " + state.objects[obj].form,
-                  "d");
-
-        return plan;
+        const search = aStarSearch(
+            new ShrdliteGraph(),
+            ShrdliteNode.fromWorld(this.world),
+            (node: ShrdliteNode) => this.checkGoalDNF(node, interpretation),
+            (node: ShrdliteNode) => this.getHeuristicDNF(node, interpretation),
+            10);
+        const result = search.path.map((node) => node.action);
+        result.push(`Path with ${search.path.length} moves (${search.visited} visited nodes)`);
+        return result;
     }
 
+    private checkGoalDNF(node: ShrdliteNode, interpretation: DNFFormula) {
+        return interpretation.conjuncts.some((conjunction) => this.checkGoalConjunction(node, conjunction));
+    }
+
+    private checkGoalConjunction(node: ShrdliteNode, conjunction: Conjunction) {
+        return conjunction.literals.every((literal) => this.checkGoalLiteral(node, literal));
+    }
+
+    private checkGoalLiteral(node: ShrdliteNode, literal: Literal) {
+        if (literal.relation === "holding") {
+            if (literal.args.length !== 1) {
+                throw new Error("Literal needs exactly one argument");
+            }
+            return literal.args[0] === node.holding;
+        }
+
+        if (literal.args.length !== 2) {
+            throw new Error("Literal needs exactly two arguments");
+        }
+        const objectA = this.getObject(literal.args[0]);
+        const objectB = this.getObject(literal.args[1]);
+        const stackA = this.getStackId(literal.args[0], node.stacks);
+        const stackB = this.getStackId(literal.args[1], node.stacks);
+        if ((stackA === undefined && objectA !== this.floor)
+            || (stackB === undefined && objectB !== this.floor)) {
+            return false;
+        }
+
+        switch (literal.relation) {
+            case "leftof":
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                return stackA < stackB;
+            case "rightof":
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                return stackA > stackB;
+            case "inside":
+                if (stackA !== stackB) {
+                    return false;
+                }
+                if (objectB.form !== "box") {
+                    return false;
+                }
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                return node.stacks[stackA].indexOf(literal.args[0])
+                    === node.stacks[stackB].indexOf(literal.args[1]) + 1;
+            case "ontop":
+                if (objectB === this.floor && stackA !== undefined
+                    && node.stacks[stackA].indexOf(literal.args[0]) === 0) {
+                    return true;
+                }
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                if (stackA !== stackB) {
+                    return false;
+                }
+                if (objectB.form === "box") {
+                    return false;
+                }
+                return node.stacks[stackA].indexOf(literal.args[0])
+                    === node.stacks[stackB].indexOf(literal.args[1]) + 1;
+            case "under":
+                if (objectA === this.floor && node.holding !== literal.args[1]) {
+                    return true;
+                }
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                if (stackA !== stackB) {
+                    return false;
+                }
+                return node.stacks[stackA].indexOf(literal.args[0])
+                    < node.stacks[stackB].indexOf(literal.args[1]);
+            case "beside":
+                return (stackA !== undefined && stackA - 1 === stackB)
+                    || (stackB !== undefined && stackA === stackB - 1);
+            case "above":
+                if (objectB === this.floor && node.holding !== literal.args[0]) {
+                    return true;
+                }
+                if (stackA === undefined || stackB === undefined) {
+                    return false;
+                }
+                if (stackA !== stackB) {
+                    return false;
+                }
+                return node.stacks[stackA].indexOf(literal.args[0]) >
+                    node.stacks[stackB].indexOf(literal.args[1]);
+            default:
+                throw new Error(`Unknown relation: ${literal.relation}`);
+        }
+    }
+
+    private getHeuristicDNF(node: ShrdliteNode, interpretation: DNFFormula) {
+        const values = interpretation.conjuncts.map((conjunction) => this.getHeuristicConjunction(node, conjunction));
+        return Math.max.apply(null, values);
+    }
+
+    private getHeuristicConjunction(node: ShrdliteNode, conjunction: Conjunction) {
+        const values = conjunction.literals.map((literal) => this.getHeuristicLiteral(node, literal));
+        return Math.min.apply(null, values);
+    }
+
+    private getHeuristicLiteral(node: ShrdliteNode, literal: Literal) {
+        if (this.checkGoalLiteral(node, literal)) {
+            // Object is in goal state
+            return 0;
+        }
+
+        let heuristic = 0;
+
+        const stackA = this.getStack(literal.args[0], node.stacks);
+        if (stackA === undefined) {
+            // Object has been picked up (needs: move, drop)
+            heuristic += 1;
+        } else {
+            // Object is on stack and might be blocked by others (need: pick up, move, drop)
+            heuristic += (stackA.length - stackA.indexOf(literal.args[0]) - 1) * 3 + 2;
+            // Arm needs to move toward object
+            heuristic += Math.abs(node.stacks.indexOf(stackA) - node.arm);
+        }
+
+        const objectB = this.getObject(literal.args[1]);
+        if (objectB === this.floor) {
+            // Object is on the floor, the lowest stack of items will need to be moved (needs: pick up, move, drop)
+            heuristic += Math.min.apply(null, node.stacks.map((stack) => stack.length)) * 3;
+        } else {
+            const stackB = this.getStack(literal.args[1], node.stacks);
+            if (stackB === undefined) {
+                // Object has been picked up (needs: drop)
+                heuristic += 1;
+            } else {
+                // Object is on stack and might be blocked by others (need: pick up, move, drop)
+                heuristic += (stackB.length - stackB.indexOf(literal.args[1]) - 1) * 3;
+            }
+
+            // A and B might need to be moved closer together
+            const posA = stackA === undefined ? node.arm : node.stacks.indexOf(stackA);
+            const posB = stackB === undefined ? node.arm : node.stacks.indexOf(stackB);
+
+            switch (literal.relation) {
+                case "leftof":
+                    heuristic += Math.max(posA - posB + 1, 0);
+                    break;
+                case "rightof":
+                    heuristic += Math.max(posB - posA + 1, 0);
+                    break;
+                case "beside":
+                    heuristic += Math.min(Math.abs(posA - posB + 1), Math.abs(posB - posA + 1));
+                    break;
+                case "inside":
+                /* falls through */
+                case "ontop":
+                /* falls through */
+                case "under":
+                /* falls through */
+                case "above":
+                /* falls through */
+                case "holding":
+                    heuristic += Math.abs(posB - posA);
+                    break;
+                default:
+                    throw new Error(`Unknown relation: ${literal.relation}`);
+            }
+        }
+        return heuristic;
+    }
+
+    /**
+     * Lookup an objects by its name in the world
+     * @param {SimpleObject} name: The name of the object to look up
+     * @returns {string} The object matching the name
+     */
+    private getObject(name: string): SimpleObject {
+        if (name === "floor") {
+            return this.floor;
+        }
+        return this.world.objects[name];
+    }
+
+    private getStack(objectName: string, stacks: string[][]) {
+        const filteredStacks = stacks
+            .filter((stack) => stack.some((obj) => obj === objectName));
+
+        if (filteredStacks.length === 0) {
+            return undefined;
+        }
+        return filteredStacks[0];
+    }
+
+    private getStackId(objectName: string, stacks: string[][]) {
+        const stack = this.getStack(objectName, stacks);
+        if (stack === undefined) {
+            return undefined;
+        }
+        return stacks.indexOf(stack);
+    }
 }
 
 /*
  * A* search nodes, to be implemented and cleaned
  */
 class ShrdliteNode {
-    // These are for making the nodes possible to compare efficiently:
+    // String identifier for efficient comparison
     public id: string;
 
-    // TODO Possibly some additional private fields or methods:
-    private private_field: string;
+    // Copy of the worlds stacks
+    public stacks: string[][];
 
-    constructor(
-        public first_field: number,
-        public second_field: string,
-        public another_field: Literal, // Note: you probably don't want any Literal here...
-    ) {
-        this.id = "TO BE IMPLEMENTED FROM THE FIELDS";
+    constructor(stacks: string[][], public holding: string | null, public  arm: number, private world: WorldState) {
+        // Make copy of stacks
+        this.stacks = [];
+        for (const stack of stacks) {
+            this.stacks.push(stack.slice());
+        }
+    }
+
+    public clone(): ShrdliteNode {
+        return new ShrdliteNode(this.stacks, this.holding, this.arm, this.world);
+    }
+
+    public static fromWorld(world: WorldState): ShrdliteNode {
+        return new ShrdliteNode(world.stacks, world.holding, world.arm, world);
     }
 
     public toString(): string {
         return this.id;
     }
+
     public compareTo(other: ShrdliteNode) {
         return this.id.localeCompare(other.id);
     }
 
-    // TODO Possibly some additional private fields or methods:
-    private privateMethod(argument: string): number {
-        throw new Error("Not implemented");
+    public updateState(action: Action): boolean {
+        switch (action) {
+            // Move arm left
+            case "l":
+                if (this.arm === 0) {
+                    // Cannot move left from leftmost position
+                    return false;
+                }
+                this.arm--;
+                break;
+            // Move arm right
+            case "r":
+                if (this.arm === this.stacks.length - 1) {
+                    // Cannot move right from rightmost position
+                    return false;
+                }
+                this.arm++;
+                break;
+            // Pick up object
+            case "p":
+                if (this.holding !== null) {
+                    // Cannot pick up an item when already holding something
+                    return false;
+                }
+                const pickStack = this.stacks[this.arm];
+                if (pickStack.length === 0) {
+                    // Cannot pick up from empty stack
+                    return false;
+                }
+                const pickedUp = pickStack.splice(-1, 1);
+                this.holding = pickedUp[0];
+                break;
+            // Drop object
+            case "d":
+                if (this.holding === null) {
+                    // Cannot drop an item without holding something
+                    return false;
+                }
+
+                // Can drop anything on the floor
+                const dropStack = this.stacks[this.arm];
+                if (dropStack.length !== 0) {
+                    const objectA = this.world.objects[this.holding];
+                    const objectB = this.world.objects[dropStack[dropStack.length - 1]];
+                    if (objectB.form === "ball") {
+                        // Cannot drop anything on a ball
+                        return false;
+                    }
+                    if (objectB.form === "box") {
+                        // Inside box
+                        if (objectA.size === "large" && objectB.size === "small") {
+                            return false;
+                        }
+                        if (objectA.form === "pyramid" || objectA.form === "plank" || objectA.form === "box") {
+                            if (objectB.size === "small" || objectA.size === "large") {
+                                return false;
+                            }
+                        }
+                    } else {
+                        // On object
+                        if (objectA.size === "large" && objectB.size === "small") {
+                            return false;
+                        }
+                        if (objectA.form === "ball") {
+                            return false;
+                        }
+                        if (objectA.form === "box" && objectA.size === "small") {
+                            if ((objectB.form === "brick" || objectB.form === "pyramid") && objectB.size === "small") {
+                                return false;
+                            }
+                        }
+                        if (objectA.form === "box" && objectA.size === "large") {
+                            if (objectB.form === "pyramid") {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                this.stacks[this.arm].push(this.holding);
+                this.holding = null;
+                break;
+        }
+
+        this.id = "";
+        for (const stack of this.stacks) {
+            this.id += stack.join() + "|";
+        }
+        this.id += this.arm + "|" + this.holding;
+        return true;
     }
 }
 
@@ -171,19 +412,22 @@ class ShrdliteNode {
  * A* search graph, to be implemented and cleaned
  */
 class ShrdliteGraph implements Graph<ShrdliteNode> {
-    // TODO  Possibly some additional private fields:
-    private private_field: string;
-
     public successors(current: ShrdliteNode): Array<Successor<ShrdliteNode>> {
-        throw new Error("Not implemented");
+        const result = [];
+        const actions = ["l", "r", "p", "d"];
+        for (const action of actions) {
+            const node = current.clone();
+            if (node.updateState(action)) {
+                const successor: Successor<ShrdliteNode> = {child: node, action, cost: 1};
+                result.push(successor);
+            }
+        }
+        return result;
     }
 
     public compareNodes(a: ShrdliteNode, b: ShrdliteNode): number {
         return a.compareTo(b);
     }
-
-    // TODO Possibly some additional private methods:
-    private privateMethod(argument: string): number {
-        throw new Error("Not implemented");
-    }
 }
+
+type Action = "l" | "r" | "p" | "d" | string;
