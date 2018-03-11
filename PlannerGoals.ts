@@ -1,6 +1,7 @@
 import {aStarSearch} from "./AStarSearch";
 import {GraphLowLevel, NodeLowLevel} from "./PlannerLowLevel";
-import {Conjunction, DNFFormula, Literal, Relation} from "./Types";
+import {Conjunction, DNFFormula, Literal, Relation, SimpleObject} from "./Types";
+import {WorldState} from "./World";
 
 export abstract class NodeGoal {
     public children: NodeGoal[] = [];
@@ -9,23 +10,33 @@ export abstract class NodeGoal {
     public abstract isFulfilled: (state: NodeLowLevel) => boolean;
     // Get heuristic of all necessary paths down to end
     public abstract getHeuristicDown: (state: NodeLowLevel) => number;
+    // If a node is a precondition, its children will always be evaluated next
+    public precondition: boolean = true;
 
     public constructor(public parentNode: NodeGoal | undefined) {}
 
-    public getChildren(state: NodeLowLevel): NodeGoal[] {
+    public getChildren(state: NodeLowLevel, up: boolean): NodeGoal[] {
+        if (this.precondition && !up) {
+            return this.children.length === 0 ? this.parentNode!.getChildren(state, true) : this.children;
+        }
+
         if (this.isFulfilled(state)) {
-            return this.parentNode!.getChildren(state);
+            return this.parentNode!.getChildren(state, true);
         }
 
         const result = this.children.filter((child) => !child.isFulfilled(state));
         if (result.length === 0) {
-            return this.parentNode!.getChildren(state);
+            return this.parentNode!.getChildren(state, true);
         }
         return result;
     }
 
     public evaluateLowLevel(state: NodeLowLevel)
         : {success: boolean, cost: number, path: string, state: NodeLowLevel | undefined} {
+        if (this.isFulfilled(state)) {
+            return this.evaluateSkip(state);
+        }
+
         const search = aStarSearch(new GraphLowLevel(),
             state,
             (node) => this.isFulfilled(node),
@@ -79,6 +90,12 @@ export abstract class CompositeGoal extends NodeGoal {
     public isFulfilled = this.allFulfilled;
     public getHeuristicDown = this.maxHeuristicDown;
 
+    public constructor(parent: NodeGoal) {
+        super(parent);
+        // Composite goals are never preconditions
+        this.precondition = false;
+    }
+
     public getHeuristic(state: NodeLowLevel): number {
         return 0;
     }
@@ -109,10 +126,11 @@ export class DnfGoal extends NodeGoal {
 
     public constructor(dnf: DNFFormula) {
         super(undefined);
+        this.precondition = false;
         this.children = dnf.conjuncts.map((conjunction) => new ConjunctionGoal(conjunction, this));
     }
 
-    public getChildren(state: NodeLowLevel): NodeGoal[] {
+    public getChildren(state: NodeLowLevel, up: boolean): NodeGoal[] {
         if (this.isFulfilled(state)) {
             return [new FinalNode(this)];
         }
@@ -185,15 +203,13 @@ class ConjunctionGoal extends CompositeGoal {
 }
 
 export class PickUpGoal extends CompositeGoal {
-    public clearStackGoal: ClearStackGoal;
-    public pickUpGoal: HoldingGoal;
-
     public constructor(public item: string, parent: NodeGoal) {
         super(parent);
-        this.clearStackGoal = new ClearStackGoal(item, this);
-        this.pickUpGoal = new HoldingGoal(item, this);
-        this.isFulfilled = this.pickUpGoal.isFulfilled;
-        this.children = [this.clearStackGoal, this.pickUpGoal];
+        this.precondition = true;
+        const clearStackGoal = new ClearStackGoal(item, this);
+        const holdingGoal = new HoldingGoal(item, this);
+        clearStackGoal.children.push(holdingGoal);
+        this.children.push(clearStackGoal);
     }
 
     public toString(): string {
@@ -260,7 +276,7 @@ class ClearStackGoal extends NodeGoal {
         if (state.holding !== undefined) {
             result++;
         }
-        result += stacks[0].length - 1 - stacks[0].indexOf(this.item);
+        result += (stacks[0].length - 1 - stacks[0].indexOf(this.item));
         return result;
     }
 
@@ -305,15 +321,14 @@ export class MoveBidirectional extends NodeGoal {
 }
 
 class MoveToStackGoal extends CompositeGoal {
-    public clearStackGoal: ClearStackGoal;
-    public onStackGoal: OnStackGoal;
-
     public constructor(public item: string, public goal: string, public relation: Relation, parent: NodeGoal) {
         super(parent);
-        this.clearStackGoal = new ClearStackGoal(item, this);
-        this.onStackGoal = new OnStackGoal(item, this.stackCheck[relation](goal), this);
-        this.isFulfilled = this.onStackGoal.isFulfilled;
-        this.children = [this.clearStackGoal, this.onStackGoal];
+        const clearStackGoal = new ClearStackGoal(item, this);
+        const clearOnStackGoal = new ClearOnStackGoal(item, this.stackCheck[relation](goal), this);
+        const onStackGoal = new OnStackGoal(item, this.stackCheck[relation](goal), this);
+        clearOnStackGoal.children.push(onStackGoal);
+        this.isFulfilled = onStackGoal.isFulfilled;
+        this.children = [clearStackGoal, clearOnStackGoal];
     }
 
     private stackCheck: {[relation: string]: (goal: string) => (stackId: number, state: NodeLowLevel) => boolean} = {
@@ -333,6 +348,96 @@ class MoveToStackGoal extends CompositeGoal {
 
     public explain(previous: string): string {
         const appendix = ` move ${this.item} ${this.relation} ${this.goal}`;
+        return this.parentNode!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    }
+}
+
+class ClearOnStackGoal extends NodeGoal {
+    public evaluate = this.evaluateLowLevel;
+    public isFulfilled = (state: NodeLowLevel) => {
+        const stacks = state.stacks.map((stack) => state.stacks.indexOf(stack))
+            .filter((stackId) => this.stackValid(stackId, state) && this.isClear(stackId, state));
+        return stacks.length > 0;
+    }
+    public getHeuristicDown = this.getHeuristic;
+
+    public constructor(public item: string,
+                       public stackValid: (stack: number, state: NodeLowLevel) => boolean,
+                       parent: NodeGoal) {
+        super(parent);
+    }
+
+    public getHeuristic(state: NodeLowLevel): number {
+        const stacks = state.stacks.map((stack) => state.stacks.indexOf(stack))
+            .filter((stackId) => this.stackValid(stackId, state));
+        const objectA = state.world.objects[this.item];
+        const itemCounts: number[] = [];
+        for (const stackId of stacks) {
+            const stack = state.stacks[stackId];
+            for (let i = 1; i <= stack.length; i++) {
+                const objectB = state.world.objects[stack[stack.length - i]];
+                if (ClearOnStackGoal.canPlace(objectA, objectB)) {
+                    itemCounts.push(i);
+                    break;
+                }
+            }
+        }
+        return Math.min.apply(Math, itemCounts);
+    }
+
+    private isClear(stackId: number, state: NodeLowLevel): boolean {
+        const dropStack = state.stacks[stackId];
+        if (dropStack.length === 0) {
+            return true;
+        }
+        const objectA = state.world.objects[this.item];
+        const objectB = state.world.objects[dropStack[dropStack.length - 1]];
+        return ClearOnStackGoal.canPlace(objectA, objectB);
+    }
+
+    private static canPlace(objectA: SimpleObject, objectB: SimpleObject): boolean {
+        if (objectB.form === "ball") {
+            // Cannot drop anything on a ball
+            return false;
+        }
+        if (objectB.form === "box") {
+            // Inside box
+            if (objectA.size === "large" && objectB.size === "small") {
+                return false;
+            }
+            if (objectA.form === "pyramid" || objectA.form === "plank" || objectA.form === "box") {
+                if (objectB.size === "small" || objectA.size === "large") {
+                    return false;
+                }
+            }
+        } else {
+            // On object
+            if (objectA.size === "large" && objectB.size === "small") {
+                return false;
+            }
+            if (objectA.form === "ball") {
+                return false;
+            }
+            if (objectA.form === "box" && objectA.size === "small") {
+                if ((objectB.form === "brick" || objectB.form === "pyramid") && objectB.size === "small") {
+                    return false;
+                }
+            }
+            if (objectA.form === "box" && objectA.size === "large") {
+                if (objectB.form === "pyramid") {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    public toString(): string {
+        return "ClearOnStack" + this.item;
+    }
+
+    public explain(previous: string): string {
+        const appendix = ` clear a stack for ${this.item}`;
         return this.parentNode!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }

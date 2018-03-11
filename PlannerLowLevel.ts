@@ -49,7 +49,7 @@ export class NodeLowLevel {
     // Copy of the worlds stacks
     public stacks: string[][];
 
-    constructor(stacks: string[][], public holding: string | null, public  arm: number, private world: WorldState) {
+    constructor(stacks: string[][], public holding: string | null, public  arm: number, public world: WorldState) {
         // Make copy of stacks
         this.stacks = [];
         for (const stack of stacks) {

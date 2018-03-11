@@ -33,7 +33,7 @@ export class NodeHighLevel {
 
     public successors(): Array<Successor<NodeHighLevel>> {
         const result: Array<Successor<NodeHighLevel>> = [];
-        const goals = this.goalNode.getChildren(this.nodeLowLevel);
+        const goals = this.goalNode.getChildren(this.nodeLowLevel, false);
         for (const goal of goals) {
             const search = goal.evaluate(this.nodeLowLevel);
             if (search.success) {
