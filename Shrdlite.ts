@@ -2,7 +2,7 @@ import {AmbiguityError} from "./AmbiguityError";
 import {interpret} from "./Interpreter";
 import {parse} from "./Parser";
 import {plan} from "./Planner";
-import {Clarification, ShrdliteResult} from "./Types";
+import {Clarification, DNFFormula, Entity, Location, MoveCommand, ShrdliteResult, SimpleObject} from "./Types";
 import {World} from "./World";
 
 /********************************************************************************
@@ -51,46 +51,56 @@ export function parseUtteranceIntoPlan(world: World, utterance: string): string[
     let interpretations;
     let plans: string | ShrdliteResult[];
 
-    // Call the parser with the utterance, and then log the parse results
-    world.printDebugInfo(`Parsing utterance: "${utterance}"`);
-    try {
-        parses = parse(utterance);
-    } catch (err) {
-        world.printError("[Parsing failure]", err);
-        return null;
-    }
-    world.printDebugInfo(`Found ${parses.length} parses`);
-    parses.forEach((result, n) => {
-        world.printDebugInfo(`  (${n}) ${result.parse.toString()}`);
-    });
-
-    if (parses.some((parse) => parse.parse instanceof Clarification)) {
-        if (Command === undefined) {
-            world.printError("Expected an instruction, please enter a command.");
+    // see if utterance is dnf, parse it, pass shrdliteresults to planner
+    if (utterance.slice(0, 4) === "dnf ") {
+        const ent: Entity = new Entity("the", new SimpleObject("anyform", null, null));
+        const loca: Location = new Location("ontop", ent);
+        interpretations = [new ShrdliteResult(utterance,
+            new MoveCommand(ent, loca),
+            DNFFormula.parse(utterance.slice(4)),
+            [])];
+    } else {
+        // Call the parser with the utterance, and then log the parse results
+        world.printDebugInfo(`Parsing utterance: "${utterance}"`);
+        try {
+            parses = parse(utterance);
+        } catch (err) {
+            world.printError("[Parsing failure]", err);
             return null;
         }
-        Clarifications.push(parses.map((parse) => parse.parse as Clarification));
-    } else {
-        Command = parses;
-        Clarifications.length = 0;
-    }
+        world.printDebugInfo(`Found ${parses.length} parses`);
+        parses.forEach((result, n) => {
+            world.printDebugInfo(`  (${n}) ${result.parse.toString()}`);
+        });
 
-    // Call the interpreter for all parses, and then log the interpretations
-    try {
-        interpretations = interpret(Command, Clarifications, world.currentState);
-        Command = undefined;
-        Clarifications.length = 0;
-    } catch (err) {
-        if (err instanceof AmbiguityError) {
-            return err.message;
+        if (parses.some((parse) => parse.parse instanceof Clarification)) {
+            if (Command === undefined) {
+                world.printError("Expected an instruction, please enter a command.");
+                return null;
+            }
+            Clarifications.push(parses.map((parse) => parse.parse as Clarification));
+        } else {
+            Command = parses;
+            Clarifications.length = 0;
         }
-        world.printError("[Interpretation failure]", err);
-        return null;
+
+        // Call the interpreter for all parses, and then log the interpretations
+        try {
+            interpretations = interpret(Command, Clarifications, world.currentState);
+            Command = undefined;
+            Clarifications.length = 0;
+        } catch (err) {
+            if (err instanceof AmbiguityError) {
+                return err.message;
+            }
+            world.printError("[Interpretation failure]", err);
+            return null;
+        }
+        world.printDebugInfo(`Found ${interpretations.length} interpretations`);
+        interpretations.forEach((result, n) => {
+            world.printDebugInfo(`  (${n}) ${result.interpretation.toString()}`);
+        });
     }
-    world.printDebugInfo(`Found ${interpretations.length} interpretations`);
-    interpretations.forEach((result, n) => {
-        world.printDebugInfo(`  (${n}) ${result.interpretation.toString()}`);
-    });
 
     // Call the planner for all interpretations, and then log the resulting plans
     try {
