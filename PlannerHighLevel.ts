@@ -1,14 +1,14 @@
 import {Graph, Successor} from "./Graph";
-import {GoalNode, InitialGoalNode} from "./PlannerGoals";
+import {NodeGoal, DnfGoal} from "./PlannerGoals";
 import {NodeLowLevel} from "./PlannerLowLevel";
 import {DNFFormula} from "./Types";
 import {WorldState} from "./World";
 
 export class GraphHighLevel implements Graph<NodeHighLevel> {
-    public goalTreeRoot: InitialGoalNode;
+    public goalTreeRoot: DnfGoal;
 
     public constructor(dnf: DNFFormula) {
-        this.goalTreeRoot = new InitialGoalNode(dnf);
+        this.goalTreeRoot = new DnfGoal(dnf);
     }
 
     public getStartingNode(world: WorldState): NodeHighLevel {
@@ -25,7 +25,7 @@ export class GraphHighLevel implements Graph<NodeHighLevel> {
 }
 
 export class NodeHighLevel {
-    public constructor(public goalNode: GoalNode, public nodeLowLevel: NodeLowLevel) {}
+    public constructor(public goalNode: NodeGoal, public nodeLowLevel: NodeLowLevel) {}
 
     public compareTo(other: NodeHighLevel): number {
         return this.getId().localeCompare(other.getId());
@@ -43,6 +43,7 @@ export class NodeHighLevel {
                     cost: search.cost});
             } else {
                 console.log("Failed to execute high level move");
+                console.log(goal);
             }
         }
         return result;
