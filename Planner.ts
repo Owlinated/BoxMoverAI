@@ -33,10 +33,7 @@ export function plan(interpretations: ShrdliteResult[], world: WorldState): Shrd
             const search = aStarSearch(graph,
                 graph.getStartingNode(world),
                 (node) => node.goalNode instanceof FinalNode,
-                // todo this heuristic is supposed to act like the goal was resolved
-                // todo subtracting its own heuristic is an invalid hack- but its fast :)
-                (node) => node.goalNode.getHeuristicUp(node.nodeLowLevel)
-                    - node.goalNode.getHeuristic(node.nodeLowLevel),
+                (node) => 0,
                 10);
             if (search.status !== "success") {
                 errors.push(`Failed: ${search.status}`);

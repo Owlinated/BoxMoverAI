@@ -45,7 +45,6 @@ const Clarifications: Clarification[][] = [];
  *           is either a robot action, like "p" (for pick up) or "r" (for going right),
  *           or a system utterance in English that describes what the robot is doing.
  */
-// todo add parameter, last request
 export function parseUtteranceIntoPlan(world: World, utterance: string): string[] | null | string {
     let parses;
     let interpretations;
