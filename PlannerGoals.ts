@@ -2,6 +2,18 @@ import {aStarSearch} from "./AStarSearch";
 import {GraphLowLevel, NodeLowLevel} from "./PlannerLowLevel";
 import {Conjunction, DNFFormula, Literal, Relation, SimpleObject} from "./Types";
 
+// todo combine with interpreter stuff
+function describeObject(object: string, state: NodeLowLevel) {
+    const simpleObject = state.world.objects[object];
+    return DescribeSimpleObject(simpleObject);
+}
+function DescribeSimpleObject(object: SimpleObject): string {
+    return "the "
+        + (object.size === null ? "" : object.size + " ")
+        + (object.color === null ? "" : object.color + " ")
+        + (object.form === "anyform" ? "object" : object.form);
+}
+
 export abstract class NodeGoal {
     public children: NodeGoal[] = [];
     public abstract evaluate: (state: NodeLowLevel) =>
@@ -44,7 +56,7 @@ export abstract class NodeGoal {
             (node) => 0.5 * this.getHeuristic(node) + 0.5 * this.getHeuristicUp(node),
             10);
         const actions = search.path.map((action) => action.action);
-        actions.unshift(this.explain(""));
+        actions.unshift(this.explain("", state));
 
         return {
             success: search.status === "success",
@@ -85,7 +97,7 @@ export abstract class NodeGoal {
             + (this.heuristicParent === undefined ? 0 : this.heuristicParent!.getHeuristicUp(state));
     }
 
-    public abstract explain(previous: string): string;
+    public abstract explain(previous: string, state: NodeLowLevel): string;
 }
 
 export abstract class CompositeGoal extends NodeGoal {
@@ -111,7 +123,7 @@ export class FinalNode extends NodeGoal {
         return 0;
     }
 
-    public explain(previous: string): string {
+    public explain(previous: string, state: NodeLowLevel): string {
         return previous;
     }
 }
@@ -137,7 +149,7 @@ export class DnfGoal extends NodeGoal {
         return 0;
     }
 
-    public explain(previous: string): string {
+    public explain(previous: string, state: NodeLowLevel): string {
         return `I ${previous}.`;
     }
 }
@@ -176,8 +188,8 @@ class ConjunctionGoal extends CompositeGoal {
         }
     }
 
-    public explain(previous: string): string {
-        return this.descriptionParent!.explain(previous);
+    public explain(previous: string, state: NodeLowLevel): string {
+        return this.descriptionParent!.explain(previous, state);
     }
 }
 
@@ -190,9 +202,9 @@ export class PickUpGoal extends CompositeGoal {
         this.isFulfilled = holdingGoal.isFulfilled;
     }
 
-    public explain(previous: string): string {
-        const appendix = ` pick up ${this.item}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix = ` pick up ${describeObject(this.item, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }
 
@@ -219,8 +231,8 @@ class HoldingGoal extends NodeGoal {
         return result;
     }
 
-    public explain(previous: string): string {
-        return this.descriptionParent!.explain(previous);
+    public explain(previous: string, state: NodeLowLevel): string {
+        return this.descriptionParent!.explain(previous, state);
     }
 }
 
@@ -267,9 +279,9 @@ class ClearStackGoal extends NodeGoal {
         return result;
     }
 
-    public explain(previous: string): string {
-        const appendix = ` clear the stack above ${this.item}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix = ` clear the stack above ${describeObject(this.item, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }
 
@@ -294,8 +306,8 @@ class MoveBidirectionalGoal extends NodeGoal {
         return 0;
     }
 
-    public explain(previous: string): string {
-        return this.descriptionParent!.explain(previous);
+    public explain(previous: string, state: NodeLowLevel): string {
+        return this.descriptionParent!.explain(previous, state);
     }
 }
 
@@ -330,9 +342,10 @@ class MoveToStackGoal extends CompositeGoal {
         }
     };
 
-    public explain(previous: string): string {
-        const appendix = ` move ${this.item} ${this.relation} ${this.goal}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix =
+            ` move ${describeObject(this.item, state)} ${this.relation} ${describeObject(this.goal, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }
 
@@ -385,9 +398,9 @@ class ClearOnStackGoal extends NodeGoal {
         return canPlace(objectA, objectB);
     }
 
-    public explain(previous: string): string {
-        const appendix = ` clear a stack for ${this.item}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix = ` clear a stack for ${describeObject(this.item, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }
 
@@ -420,8 +433,8 @@ class OnStackGoal extends NodeGoal {
         return Math.min.apply(Math, distances);
     }
 
-    public explain(previous: string): string {
-        return this.descriptionParent!.explain(previous);
+    public explain(previous: string, state: NodeLowLevel): string {
+        return this.descriptionParent!.explain(previous, state);
     }
 }
 
@@ -440,9 +453,9 @@ class MoveOnTopGoal extends CompositeGoal {
         this.isFulfilled = sameStackGoal.isFulfilled;
     }
 
-    public explain(previous: string): string {
-        const appendix = ` move ${this.item} ontop ${this.goal}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix = ` move ${describeObject(this.item, state)} ontop ${describeObject(this.goal, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }
 
@@ -460,9 +473,9 @@ class MoveAboveGoal extends CompositeGoal {
         this.isFulfilled = sameStackGoal.isFulfilled;
     }
 
-    public explain(previous: string): string {
-        const appendix = ` move ${this.item} above ${this.goal}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix = ` move ${describeObject(this.item, state)} above ${describeObject(this.goal, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }
 
@@ -529,9 +542,10 @@ class WidenStackGoal extends NodeGoal {
         return result * 10;
     }
 
-    public explain(previous: string): string {
-        const appendix = ` widen stack of ${this.item} to acoomodate ${this.goal}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix =
+            ` widen stack of ${describeObject(this.item, state)} to acoomodate ${describeObject(this.goal, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }
 
@@ -596,8 +610,8 @@ class SameStackGoal extends NodeGoal {
         return Math.abs(state.stacks.indexOf(stacksA[0]) -  state.stacks.indexOf(stacksB[0]));
     }
 
-    public explain(previous: string): string {
-        return this.descriptionParent!.explain(previous);
+    public explain(previous: string, state: NodeLowLevel): string {
+        return this.descriptionParent!.explain(previous, state);
     }
 }
 
