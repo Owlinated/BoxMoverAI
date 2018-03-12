@@ -9,7 +9,7 @@
       "max-classes-per-file": [false],
       "variable-name": [false],
       "no-shadowed-variable": false,
-      "interface-name": [true, "never-prefix"],
+      "interface-name": [false],
       "object-literal-sort-keys": [true, "match-declaration-order"],
       "trailing-comma": [false],
       "no-console": [false],

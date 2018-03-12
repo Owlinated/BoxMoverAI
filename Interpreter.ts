@@ -669,9 +669,6 @@ class Interpreter {
                 if (objectB.form === "ball") {
                     return false;
                 }
-                if (objectB.size === "small" && objectA.size === "large") {
-                    return false;
-                }
                 return true;
             default:
                 throw new Error(`Unknown relation: ${literal.relation}`);
