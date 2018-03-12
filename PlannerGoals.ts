@@ -45,6 +45,7 @@ export abstract class NodeGoal {
             10);
         const actions = search.path.map((action) => action.action);
         actions.unshift(this.explain(""));
+
         return {
             success: search.status === "success",
             cost: search.cost, path: actions.join(";"),
@@ -176,8 +177,7 @@ class ConjunctionGoal extends CompositeGoal {
     }
 
     public explain(previous: string): string {
-        const appendix = ` fulfill ${this.conjunction.toString()}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous);
     }
 }
 
@@ -192,7 +192,7 @@ export class PickUpGoal extends CompositeGoal {
 
     public explain(previous: string): string {
         const appendix = ` pick up ${this.item}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }
 
@@ -220,7 +220,7 @@ class HoldingGoal extends NodeGoal {
     }
 
     public explain(previous: string): string {
-        return this.heuristicParent!.explain(previous);
+        return this.descriptionParent!.explain(previous);
     }
 }
 
@@ -269,7 +269,7 @@ class ClearStackGoal extends NodeGoal {
 
     public explain(previous: string): string {
         const appendix = ` clear the stack above ${this.item}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }
 
@@ -295,7 +295,7 @@ class MoveBidirectionalGoal extends NodeGoal {
     }
 
     public explain(previous: string): string {
-        return this.heuristicParent!.explain(previous);
+        return this.descriptionParent!.explain(previous);
     }
 }
 
@@ -332,10 +332,11 @@ class MoveToStackGoal extends CompositeGoal {
 
     public explain(previous: string): string {
         const appendix = ` move ${this.item} ${this.relation} ${this.goal}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }
 
+// clear until item can be placed on a stack that's deemed valid by a callback
 class ClearOnStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
     public isFulfilled = (state: NodeLowLevel) => {
@@ -386,10 +387,11 @@ class ClearOnStackGoal extends NodeGoal {
 
     public explain(previous: string): string {
         const appendix = ` clear a stack for ${this.item}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }
 
+// moves an item on a stack that valid according to a callback
 class OnStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
     public isFulfilled = (state: NodeLowLevel) => {
@@ -419,7 +421,7 @@ class OnStackGoal extends NodeGoal {
     }
 
     public explain(previous: string): string {
-        return this.heuristicParent!.explain(previous);
+        return this.descriptionParent!.explain(previous);
     }
 }
 
@@ -440,7 +442,7 @@ class MoveOnTopGoal extends CompositeGoal {
 
     public explain(previous: string): string {
         const appendix = ` move ${this.item} ontop ${this.goal}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }
 
@@ -460,7 +462,7 @@ class MoveAboveGoal extends CompositeGoal {
 
     public explain(previous: string): string {
         const appendix = ` move ${this.item} above ${this.goal}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }
 
@@ -529,7 +531,7 @@ class WidenStackGoal extends NodeGoal {
 
     public explain(previous: string): string {
         const appendix = ` widen stack of ${this.item} to acoomodate ${this.goal}`;
-        return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
     }
 }
 
@@ -595,7 +597,7 @@ class SameStackGoal extends NodeGoal {
     }
 
     public explain(previous: string): string {
-        return this.heuristicParent!.explain(previous);
+        return this.descriptionParent!.explain(previous);
     }
 }
 
