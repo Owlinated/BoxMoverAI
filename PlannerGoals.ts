@@ -84,8 +84,6 @@ export abstract class NodeGoal {
             + (this.heuristicParent === undefined ? 0 : this.heuristicParent!.getHeuristicUp(state));
     }
 
-    public abstract toString(): string;
-
     public abstract explain(previous: string): string;
 }
 
@@ -112,10 +110,6 @@ export class FinalNode extends NodeGoal {
         return 0;
     }
 
-    public toString(): string {
-        return "Goal";
-    }
-
     public explain(previous: string): string {
         return previous;
     }
@@ -140,10 +134,6 @@ export class DnfGoal extends NodeGoal {
 
     public getHeuristic(state: NodeLowLevel): number {
         return 0;
-    }
-
-    public toString(): string {
-        return "Start";
     }
 
     public explain(previous: string): string {
@@ -185,10 +175,6 @@ class ConjunctionGoal extends CompositeGoal {
         }
     }
 
-    public toString(): string {
-        return "Conjunction" + this.conjunction.toString();
-    }
-
     public explain(previous: string): string {
         const appendix = ` fulfill ${this.conjunction.toString()}`;
         return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
@@ -202,10 +188,6 @@ export class PickUpGoal extends CompositeGoal {
         this.appendChild((parent) => new ClearStackGoal(item, parent, this));
         const holdingGoal = this.appendChild((parent) => new HoldingGoal(item, parent, this));
         this.isFulfilled = holdingGoal.isFulfilled;
-    }
-
-    public toString(): string {
-        return this.heuristicParent!.toString() + "PickUp" + this.item;
     }
 
     public explain(previous: string): string {
@@ -235,10 +217,6 @@ class HoldingGoal extends NodeGoal {
             result++;
         }
         return result;
-    }
-
-    public toString(): string {
-        return this.heuristicParent!.toString() + "Holding" + this.item;
     }
 
     public explain(previous: string): string {
@@ -289,10 +267,6 @@ class ClearStackGoal extends NodeGoal {
         return result;
     }
 
-    public toString(): string {
-        return this.heuristicParent!.toString() + "ClearStack" + this.item;
-    }
-
     public explain(previous: string): string {
         const appendix = ` clear the stack above ${this.item}`;
         return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
@@ -318,11 +292,6 @@ class MoveBidirectionalGoal extends NodeGoal {
 
     public getHeuristic(state: NodeLowLevel): number {
         return 0;
-    }
-
-    public toString(): string {
-        return this.heuristicParent!.toString()
-            + "MoveBidirectionalGoal" + this.item + this.relationA + this.relationB + this.goal;
     }
 
     public explain(previous: string): string {
@@ -360,10 +329,6 @@ class MoveToStackGoal extends CompositeGoal {
                 || (state.stacks.indexOf(stacks[0]) + 1 === stackId);
         }
     };
-
-    public toString(): string {
-        return this.heuristicParent!.toString() + "MoveToStack" + this.item + this.relation + this.goal;
-    }
 
     public explain(previous: string): string {
         const appendix = ` move ${this.item} ${this.relation} ${this.goal}`;
@@ -419,10 +384,6 @@ class ClearOnStackGoal extends NodeGoal {
         return canPlace(objectA, objectB);
     }
 
-    public toString(): string {
-        return this.heuristicParent!.toString() + "ClearOnStack" + this.item;
-    }
-
     public explain(previous: string): string {
         const appendix = ` clear a stack for ${this.item}`;
         return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
@@ -457,10 +418,6 @@ class OnStackGoal extends NodeGoal {
         return Math.min.apply(Math, distances);
     }
 
-    public toString(): string {
-        return this.heuristicParent!.toString() + "OnStack" + this.item;
-    }
-
     public explain(previous: string): string {
         return this.heuristicParent!.explain(previous);
     }
@@ -481,10 +438,6 @@ class MoveOnTopGoal extends CompositeGoal {
         this.isFulfilled = sameStackGoal.isFulfilled;
     }
 
-    public toString(): string {
-        return this.heuristicParent!.toString() + "MoveOnTop" + this.item + this.goal;
-    }
-
     public explain(previous: string): string {
         const appendix = ` move ${this.item} ontop ${this.goal}`;
         return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
@@ -503,10 +456,6 @@ class MoveAboveGoal extends CompositeGoal {
         const sameStackGoal =
             this.appendChild((parent) => new SameStackGoal(item, "above", goal, parent, this));
         this.isFulfilled = sameStackGoal.isFulfilled;
-    }
-
-    public toString(): string {
-        return this.heuristicParent!.toString() + "MoveAbove" + this.item + this.goal;
     }
 
     public explain(previous: string): string {
@@ -578,10 +527,6 @@ class WidenStackGoal extends NodeGoal {
         return result * 10;
     }
 
-    public toString(): string {
-        return this.heuristicParent!.toString() + "WidenStack" + this.item;
-    }
-
     public explain(previous: string): string {
         const appendix = ` widen stack of ${this.item} to acoomodate ${this.goal}`;
         return this.heuristicParent!.explain(previous ? `${previous} to ${appendix}` : appendix);
@@ -647,10 +592,6 @@ class SameStackGoal extends NodeGoal {
             return Math.abs(stackID - state.arm);
         }
         return Math.abs(state.stacks.indexOf(stacksA[0]) -  state.stacks.indexOf(stacksB[0]));
-    }
-
-    public toString(): string {
-        return this.heuristicParent!.toString() + "SameStack" + this.item + this.relation + this.goal;
     }
 
     public explain(previous: string): string {
