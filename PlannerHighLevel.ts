@@ -1,5 +1,5 @@
 import {Graph, Successor} from "./Graph";
-import {NodeGoal, DnfGoal} from "./PlannerGoals";
+import {DnfGoal, NodeGoal} from "./PlannerGoals";
 import {NodeLowLevel} from "./PlannerLowLevel";
 import {DNFFormula} from "./Types";
 import {WorldState} from "./World";
@@ -25,7 +25,12 @@ export class GraphHighLevel implements Graph<NodeHighLevel> {
 }
 
 export class NodeHighLevel {
-    public constructor(public goalNode: NodeGoal, public nodeLowLevel: NodeLowLevel) {}
+    private static counter = 0;
+    private id: number;
+
+    public constructor(public goalNode: NodeGoal, public nodeLowLevel: NodeLowLevel) {
+        this.id = NodeHighLevel.counter++;
+    }
 
     public compareTo(other: NodeHighLevel): number {
         return this.getId().localeCompare(other.getId());
@@ -50,7 +55,7 @@ export class NodeHighLevel {
     }
 
     public getId(): string {
-        return this.nodeLowLevel.id + this.goalNode.toString();
+        return this.id.toString();
     }
 
     public toString(): string {
