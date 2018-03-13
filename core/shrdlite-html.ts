@@ -1,4 +1,4 @@
-import "jquery";
+import * as $ from "jquery";
 import {ExampleWorlds} from "../world/ExampleWorlds";
 import {SVGWorld} from "../world/SVGWorld";
 import {World} from "../world/World";
@@ -12,7 +12,7 @@ import {parseUtteranceIntoPlan, splitStringIntoPlan} from "./Shrdlite";
  */
 
 const defaultWorld = "small";
-const defaultSpeech = false;
+const defaultSpeech = true;
 
 $(function() {
     let current: string = getURLParameter("world");

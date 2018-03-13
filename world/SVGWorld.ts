@@ -1,4 +1,4 @@
-import "jquery";
+import * as $ from "jquery";
 import {World, WorldState} from "./World";
 
 /*

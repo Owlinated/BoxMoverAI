@@ -9,10 +9,8 @@
   },
   "scripts": {
     "nearley": "nearleyc ./parser/Grammar.ne > ./parser/Grammar.ts",
-    "compile": "npm run nearley && webpack && cpx ./core/shrdlite.html ./dist/ && cpx ./core/shrdlite.css ./dist/",
-    "start": "npm run compile && start http://localhost:3333/dist/shrdlite && http-server -a localhost -p 3333",
-    "compileoffline": "npm run nearley && tsc",
-    "startoffline": "npm run compile && node ./core/shrdlite-offline.js"
+    "start": "npm run nearley && webpack && opn http://localhost:8080/dist/shrdlite.html && webpack-serve",
+    "startoffline": "npm run nearley && tsc && node ./core/shrdlite-offline.js"
   },
   "repository": {
     "type": "git",
@@ -32,11 +30,11 @@
   },
   "devDependencies": {
     "cpx": "^1.5.0",
-    "http-server": "^0.11.1",
     "opn-cli": "^3.1.0",
     "ts-loader": "^4.0.1",
     "typescript": "^2.7.2",
     "webpack": "^4.1.1",
-    "webpack-cli": "^2.0.11"
+    "webpack-cli": "^2.0.11",
+    "webpack-serve": "^0.2.0"
   }
 }
