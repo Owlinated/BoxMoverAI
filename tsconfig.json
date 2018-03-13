@@ -1,17 +1,16 @@
 {
   "compilerOptions": {
-    "module": "umd",
     "noImplicitAny": true,
     "removeComments": false,
     "preserveConstEnums": true,
     "sourceMap": true,
-    "strict": true
+    "strict": true,
+    "noLib": false
   },
   "include": [
     "**/*.ts"
   ],
   "exclude": [
-    "/lib/**/*",
-    "**/*.spec.ts"
+    "node_modules"
   ]
 }

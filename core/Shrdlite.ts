@@ -2,8 +2,8 @@ import {AmbiguityError} from "../interpreter/AmbiguityError";
 import {interpret} from "../interpreter/Interpreter";
 import {parse} from "../parser/Parser";
 import {plan} from "../planner/Planner";
-import {Clarification, DNFFormula, Entity, Location, MoveCommand, ShrdliteResult, SimpleObject} from "./Types";
 import {World} from "../world/World";
+import {Clarification, DNFFormula, Entity, Location, MoveCommand, ShrdliteResult, SimpleObject} from "./Types";
 
 /********************************************************************************
 ** Shrdlite

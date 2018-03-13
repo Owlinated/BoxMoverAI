@@ -1,8 +1,8 @@
-
-import {ParserRules, ParserStart} from "./Grammar";
-import * as nearley from "../lib/nearley";
+import * as nearley from "nearley";
+import {Grammar} from "nearley";
+import {ParserOptions} from "nearley";
 import {Command, DNFFormula, ShrdliteResult} from "../core/Types";
-import {WorldState} from "../world/World";
+import * as grammar from "./Grammar";
 
 /*
  * Parser
@@ -25,7 +25,7 @@ import {WorldState} from "../world/World";
  */
 export function parse(input: string): ShrdliteResult[] {
     const NearleyParser = (typeof window !== "undefined") ? window.nearley.Parser : nearley.Parser;
-    const the_parser = new NearleyParser(ParserRules, ParserStart);
+    const the_parser = new NearleyParser(nearley.Grammar.fromCompiled(grammar));
     // The grammar does not recognise uppercase, whitespace or punctuation,
     // so we make it lowercase and remove all whitespace and punctuation:
     const parsestr = input.toLowerCase().replace(/\W/g, "");
@@ -54,6 +54,6 @@ export function parse(input: string): ShrdliteResult[] {
 // Additional declaration to make the parser work both in Node.js and in the browser.
 declare global {
     interface Window {
-        nearley: {Parser: {new (rules: {[s: string]: any}, start: string): nearley.Parser}};
+        nearley: {Parser: {new (grammar: Grammar, options?: ParserOptions): nearley.Parser}};
     }
 }

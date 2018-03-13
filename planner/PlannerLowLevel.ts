@@ -44,7 +44,7 @@ export class GraphLowLevel implements Graph<NodeLowLevel> {
 
 export class NodeLowLevel {
     // String identifier for efficient comparison
-    public id: string;
+    public id: string = "";
 
     // Copy of the worlds stacks
     public stacks: string[][];
@@ -117,38 +117,8 @@ export class NodeLowLevel {
                 if (dropStack.length !== 0) {
                     const objectA = this.world.objects[this.holding];
                     const objectB = this.world.objects[dropStack[dropStack.length - 1]];
-                    if (objectB.form === "ball") {
-                        // Cannot drop anything on a ball
+                    if (!canPlace(objectA, objectB)) {
                         return false;
-                    }
-                    if (objectB.form === "box") {
-                        // Inside box
-                        if (objectA.size === "large" && objectB.size === "small") {
-                            return false;
-                        }
-                        if (objectA.form === "pyramid" || objectA.form === "plank" || objectA.form === "box") {
-                            if (objectB.size === "small" || objectA.size === "large") {
-                                return false;
-                            }
-                        }
-                    } else {
-                        // On object
-                        if (objectA.size === "large" && objectB.size === "small") {
-                            return false;
-                        }
-                        if (objectA.form === "ball") {
-                            return false;
-                        }
-                        if (objectA.form === "box" && objectA.size === "small") {
-                            if ((objectB.form === "brick" || objectB.form === "pyramid") && objectB.size === "small") {
-                                return false;
-                            }
-                        }
-                        if (objectA.form === "box" && objectA.size === "large") {
-                            if (objectB.form === "pyramid") {
-                                return false;
-                            }
-                        }
                     }
                 }
                 this.stacks[this.arm].push(this.holding);
@@ -163,6 +133,51 @@ export class NodeLowLevel {
         this.id += this.arm + "|" + this.holding;
         return true;
     }
+}
+
+export function canPlace(objectA: SimpleObject, objectB: SimpleObject): boolean {
+    if (objectA === undefined) {
+        // We cannot move the floor
+        return false;
+    }
+    if (objectB === undefined) {
+        // Can place everything on floor
+        return true;
+    }
+    if (objectB.form === "ball") {
+        // Cannot drop anything on a ball
+        return false;
+    }
+    if (objectB.form === "box") {
+        // Inside box
+        if (objectA.size === "large" && objectB.size === "small") {
+            return false;
+        }
+        if (objectA.form === "pyramid" || objectA.form === "plank" || objectA.form === "box") {
+            if (objectB.size === "small" || objectA.size === "large") {
+                return false;
+            }
+        }
+    } else {
+        // On object
+        if (objectA.size === "large" && objectB.size === "small") {
+            return false;
+        }
+        if (objectA.form === "ball") {
+            return false;
+        }
+        if (objectA.form === "box" && objectA.size === "small") {
+            if ((objectB.form === "brick" || objectB.form === "pyramid") && objectB.size === "small") {
+                return false;
+            }
+        }
+        if (objectA.form === "box" && objectA.size === "large") {
+            if (objectB.form === "pyramid") {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 type Action = "l" | "r" | "p" | "d" | string;

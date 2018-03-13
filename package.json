@@ -1,0 +1,42 @@
+{
+  "name": "shrdlite",
+  "version": "1.0.0",
+  "description": "The Shrdlite course project",
+  "main": "shrdlite-offline.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "nearley": "nearleyc ./parser/Grammar.ne > ./parser/Grammar.ts",
+    "compile": "npm run nearley && webpack && cpx ./core/shrdlite.html ./dist/ && cpx ./core/shrdlite.css ./dist/",
+    "start": "npm run compile && start http://localhost:3333/dist/shrdlite && http-server -a localhost -p 3333",
+    "compileoffline": "npm run nearley && tsc",
+    "startoffline": "npm run compile && node ./core/shrdlite-offline.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChalmersGU-AI-course/project-group-z.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ChalmersGU-AI-course/project-group-z/issues"
+  },
+  "homepage": "https://github.com/ChalmersGU-AI-course/project-group-z#readme",
+  "dependencies": {
+    "@types/jquery": "^3.3.1",
+    "@types/nearley": "^2.11.0",
+    "@types/node": "^9.4.7",
+    "jquery": "^3.3.1",
+    "nearley": "^2.13.0",
+    "typescript-collections": "^1.3.2"
+  },
+  "devDependencies": {
+    "cpx": "^1.5.0",
+    "http-server": "^0.11.1",
+    "opn-cli": "^3.1.0",
+    "ts-loader": "^4.0.1",
+    "typescript": "^2.7.2",
+    "webpack": "^4.1.1",
+    "webpack-cli": "^2.0.11"
+  }
+}

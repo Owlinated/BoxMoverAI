@@ -1,5 +1,5 @@
 import {Graph, Successor} from "./Graph";
-import {DnfGoal, NodeGoal} from "./goals/PlannerGoals";
+import {DnfGoal, NodeGoal} from "./Goals";
 import {NodeLowLevel} from "./PlannerLowLevel";
 import {DNFFormula} from "../core/Types";
 import {WorldState} from "../world/World";

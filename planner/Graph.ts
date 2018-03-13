@@ -9,9 +9,11 @@
  * An edge in a directed weighted graph
  */
 export class Successor<Node> {
-    public action: string;
-    public child: Node;
-    public cost: number;
+    constructor(
+    public action: string,
+    public child: Node,
+    public cost: number
+    ) {}
 }
 
 /**

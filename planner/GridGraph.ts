@@ -1,6 +1,5 @@
-
+import {Set} from "typescript-collections";
 import {Graph, Successor} from "./Graph";
-import Set from "../lib/typescript-collections/src/lib/Set";
 
 /*
  * GridGraph
@@ -105,7 +104,7 @@ export class GridGraph implements Graph<GridNode> {
             grid[2 * this.ysize].splice(4 * x, 5, "+", "-", "-", "-", "+");
             grid[0].splice(4 * x, 5, "+", "-", "-", "-", "+");
         }
-        this.walls.forEach((node) => {
+        this.walls.forEach((node: GridNode) => {
             grid[2 * node.y + 2].splice(4 * node.x, 5, "+", "-", "-", "-", "+");
             grid[2 * node.y + 1].splice(4 * node.x, 5, "|", "#", "#", "#", "|");
             grid[2 * node.y + 0].splice(4 * node.x, 5, "+", "-", "-", "-", "+");

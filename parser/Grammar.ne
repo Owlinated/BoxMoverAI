@@ -15,7 +15,7 @@ import {
     Clarification,
     Location, Entity,
     Object, RelativeObject, SimpleObject,
-} from "./Types";
+} from "../core/Types";
 %}
 
 ## Grammar rules

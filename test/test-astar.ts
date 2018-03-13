@@ -1,9 +1,7 @@
-///<reference path="../lib/node.d.ts"/>
-
 import {aStarSearch} from "../planner/AStarSearch";
-import {TestCase, testCases} from "./AStarTestCases";
 import {Graph, SearchResult, Successor} from "../planner/Graph";
 import {Coordinate, GridGraph, GridNode} from "../planner/GridGraph";
+import {TestCase, testCases} from "./AStarTestCases";
 
 /*
  * test-astar

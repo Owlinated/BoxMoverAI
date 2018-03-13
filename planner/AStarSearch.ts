@@ -1,7 +1,5 @@
+import {Dictionary, PriorityQueue, Set} from "typescript-collections";
 import {Graph, SearchResult, Successor} from "./Graph";
-import Dictionary from "../lib/typescript-collections/src/lib/Dictionary";
-import PriorityQueue from "../lib/typescript-collections/src/lib/PriorityQueue";
-import Set from "../lib/typescript-collections/src/lib/Set";
 
 /*
  * AStarSearch
@@ -149,7 +147,8 @@ class SearchNode<Node> {
 class Frontier<Node> {
     // Priority queue for quick access to next element
     private queue: PriorityQueue<SearchNode<Node>> =
-        new PriorityQueue<SearchNode<Node>>((nodeA, nodeB) => nodeB.totalCost() - nodeA.totalCost());
+        new PriorityQueue<SearchNode<Node>>((nodeA: SearchNode<Node>, nodeB: SearchNode<Node>) =>
+            nodeB.totalCost() - nodeA.totalCost());
 
     // Dictionary for quick access by node
     private nodeDictionary: Dictionary<Node, SearchNode<Node>> =

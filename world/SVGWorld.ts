@@ -1,5 +1,4 @@
-
-import "../lib/jquery";
+import "jquery";
 import {World, WorldState} from "./World";
 
 /*
@@ -65,15 +64,15 @@ export class SVGWorld implements World {
             large: {width: 1.00, height: 0.40, thickness: 0.10}},
     };
 
-    private inputCallback: (input: string) => void;
+    private inputCallback: (input: string) => void = () => { /* Empty */};
 
     constructor(
         public currentState: WorldState,
         public useSpeech = false
     ) {
         if (!this.currentState.arm) { this.currentState.arm = 0; }
-        this.canvasWidth = this.containers.world.width() - 2 * this.wallSeparation;
-        this.canvasHeight = this.containers.world.height() - this.floorThickness;
+        this.canvasWidth = this.containers.world.width()! - 2 * this.wallSeparation;
+        this.canvasHeight = this.containers.world.height()! - this.floorThickness;
 
         const dropdown: JQuery = this.containers.inputexamples;
         dropdown.empty();
@@ -83,7 +82,7 @@ export class SVGWorld implements World {
         });
 
         dropdown.change(() => {
-            const userinput = dropdown.val().trim();
+            const userinput = (dropdown.val() as string).trim();
             if (userinput) {
                 this.containers.userinput.val(userinput).focus();
             }
@@ -475,7 +474,7 @@ export class SVGWorld implements World {
     }
 
     private handleUserInput() {
-        const userinput = this.containers.userinput.val().trim();
+        const userinput = (this.containers.userinput.val() as string).trim();
         this.disableInput();
         this.printSystemOutput(userinput, "user");
         this.inputCallback(userinput);

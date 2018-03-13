@@ -1,17 +1,27 @@
+import {Dictionary, util} from 'typescript-collections';
+import {WorldState} from "../world/World";
 import {AmbiguityError} from "./AmbiguityError";
-import Dictionary from "../lib/typescript-collections/src/lib/Dictionary";
-import {World, WorldState} from "../world/World";
 
+import {ListObjects} from "../core/Describer";
 import {
     Clarification,
     Command,
-    Conjunction, DNFFormula, DropCommand, Entity,
-    Literal, Location,
-    MoveCommand, Object, Relation, RelativeObject,
-    ShrdliteResult, SimpleObject, TakeCommand,
+    Conjunction,
+    DNFFormula,
+    DropCommand,
+    Entity,
+    Literal,
+    Location,
+    MoveCommand,
+    Object,
+    Relation,
+    RelativeObject,
+    ShrdliteResult,
+    SimpleObject,
+    TakeCommand,
 } from "../core/Types";
-
-import * as util from "../lib/typescript-collections/src/lib/util";
+import {resolveParseAmbiguities} from "./AmbiguityResolver";
+import {GetSimple} from "../core/Helper";
 
 /*
  * Interpreter
@@ -54,11 +64,8 @@ export function interpret(
     parses: ShrdliteResult[],
     clarifications: Clarification[][],
     world: WorldState): ShrdliteResult[] {
-    // Make a copy of clarifications
-    clarifications = clarifications.slice();
 
     const errors: Error[] = [];
-    const interpretations: ShrdliteResult[] = [];
     const possibleParses: ShrdliteResult[] = [];
     const interpreter: Interpreter = new Interpreter(world);
 
@@ -68,7 +75,6 @@ export function interpret(
             const intp: DNFFormula = interpreter.interpretCommand(parse.parse, []);
             possibleParses.push(parse);
             parse.interpretation = intp;
-            interpretations.push(parse);
         } catch (err) {
             if (err instanceof AmbiguityError) {
                 possibleParses.push(parse);
@@ -77,213 +83,26 @@ export function interpret(
         }
     }
 
+    // Test if any parse can be successful
     if (possibleParses.length === 0) {
-        // merge all errors into one
         throw errors.join(" ; ");
     }
 
-    let ambiguousObjects: Array<{parse: ShrdliteResult, entity: Entity}> = [];
-    for (const parse of possibleParses) {
-        if (parse.parse instanceof MoveCommand) {
-            ambiguousObjects.push({parse, entity: parse.parse.entity});
-        } else if (parse.parse instanceof TakeCommand) {
-            ambiguousObjects.push({parse, entity: parse.parse.entity});
-        } else if (parse.parse instanceof DropCommand) {
-            // Describe the object being held in terms of an entity
-            ambiguousObjects.push({parse, entity:
-                    new Entity("the",
-                        new RelativeObject(
-                            new SimpleObject("anyform", null, null),
-                            new Location("holding",
-                                new Entity("the",
-                                    new SimpleObject("anyform", null, null)))))});
-        } else {
-            throw Error(`Unexpected ambiguity in ${parse}`);
-        }
-    }
+    // Resolve ambiguities
+    const result = resolveParseAmbiguities(possibleParses, clarifications.slice(), interpreter);
 
-    while (ambiguousObjects.length > 1 && clarifications.length > 0) {
-        const clarification = clarifications.splice(0, 1)[0];
-        ambiguousObjects = ambiguousObjects.filter((object) =>
-            clarification.some((clar) =>
-                isObjectMatch((clar as Clarification).entity.object, object.entity.object)));
-    }
-
-    if (ambiguousObjects.length === 0) {
-        throw new Error("No interpretation matches your clarifications.");
-    }
-
-    if (ambiguousObjects.length <= 1) {
-        const result = ambiguousObjects[0].parse;
-        result.interpretation = interpreter.interpretCommand(result.parse, clarifications);
-        return [result];
-    }
-
-    const objectsDescription = ListObjects(ambiguousObjects.map((parse) => parse.entity.object));
-    throw new AmbiguityError(`Do you want me to move ${objectsDescription}?`);
-}
-
-function isEntityMatch(filter: Entity, entity: Entity): boolean {
-    if (entity.quantifier !== filter.quantifier) {
-        return false;
-    }
-    return isObjectMatch(filter.object, entity.object);
-}
-
-function isObjectMatch(filter: Object, object: Object): boolean {
-    if (filter instanceof SimpleObject) {
-        object = GetSimple(object);
-        if (filter.form !== "anyform" && object.form !== filter.form) {
-            return false;
-        }
-        if (filter.color !== null && object.color !== filter.color) {
-            return false;
-        }
-        if (filter.size !== null && object.size !== filter.size) {
-            return false;
-        }
-        return true;
-    } else {
-        if (filter.location.relation === "at any location") {
-            if (object instanceof RelativeObject) {
-                return false;
-            }
-            return isObjectMatch(filter.object, object);
-        }
-        if (object instanceof SimpleObject) {
-            return false;
-        }
-        return isLocationMatch(filter.location, object.location) && isObjectMatch(filter.object, object.object);
-    }
-}
-
-function isLocationMatch(filter: Location, location: Location) : boolean {
-    if (location.relation !== filter.relation) {
-        return false;
-    }
-    return isEntityMatch(filter.entity, location.entity);
+    // Run interpretation
+    result.interpretation = interpreter.interpretCommand(result.parse, clarifications);
+    return [result];
 }
 
 // By Form
-function ListObjects(objects: Object[]): string {
-    if (objects.length === 0) {
-        throw new Error("Objects cannot be empty");
-    }
-    const grouped = GroupBy(objects, (object) => GetSimple(object).form);
-    const keys = Object.keys(grouped);
-    const terms = keys.map((key) => `${ListObjectsByColor((grouped as any)[key], key === "anyform" ? "object" : key)}`);
-    const result = StringOrJoin(terms);
-
-    if (keys.length === 1 && result === "the " + keys[0]) {
-        throw new AmbiguityError(`Found similar objects. Please describe your ${keys[0]}.`);
-    }
-    return result;
-}
-
-function ListObjectsByColor(objects: Object[], description: string): string {
-    if (objects.length === 0) {
-        throw new Error("Objects cannot be empty");
-    }
-    const grouped = GroupBy(objects, (object) => GetSimple(object).color);
-    const keys = Object.keys(grouped);
-    if (keys.length === 1) {
-        return ListObjectsBySize((grouped as any)[keys[0]], description);
-    }
-    const terms = keys.map((key) =>
-        ListObjectsBySize((grouped as any)[key],
-            `${key === "undefined" ? "any color" : key} ${description}`));
-    return ` ${StringOrJoin(terms)}`;
-}
-
-function ListObjectsBySize(objects: Object[], description: string): string {
-    if (objects.length === 0) {
-        throw new Error("Objects cannot be empty");
-    }
-    const grouped = GroupBy(objects, (object) => GetSimple(object).size);
-    const keys = Object.keys(grouped);
-    if (keys.length === 1) {
-        return `the ${ListObjectsByLocation((grouped as any)[keys[0]], description)}`;
-    }
-    const terms = keys.map((key) =>
-        ListObjectsByLocation((grouped as any)[key], key === "undefined" ? "any size" : key));
-    return ` the ${StringOrJoin(terms)} ${description}`;
-}
-
-function ListObjectsByLocation(objects: Object[], description: string): string {
-    if (objects.length === 0) {
-        throw new Error("Objects cannot be empty");
-    }
-    const grouped = GroupBy(
-        objects,
-        (object) => object instanceof RelativeObject ? DescribeLocation(object.location) : undefined);
-    const keys = Object.keys(grouped);
-    if (keys.length === 1) {
-        return description;
-    }
-
-    const terms = keys.map((key) => key === "undefined" ? "at any location" : key);
-    return `${description} ${terms.join(" or the one ")}`;
-}
-
-function DescribeLocation(location: Location): string {
-    if (location.relation === "at any location") {
-        return location.relation;
-    }
-    if (location.relation === "holding") {
-        return "being held";
-    }
-    return `that is ${location.relation} ${DescribeEntity(location.entity)}`;
-}
-
-function DescribeEntity(entity: Entity): string {
-    return `${entity.quantifier} ${DescribeObject(entity.object)}`;
-}
-
-function DescribeObject(object: Object): string {
-    const locations: Location[] = [];
-    let relativeObject = object;
-    while (relativeObject instanceof RelativeObject) {
-        locations.push(relativeObject.location);
-        relativeObject = relativeObject.object;
-    }
-    return `${DescribeSimpleObject(relativeObject)} ${locations.map(DescribeLocation).join(" ")}`;
-}
-
-function DescribeSimpleObject(object: SimpleObject): string {
-    return (object.size === null ? "" : object.size + " ")
-        + (object.color === null ? "" : object.color + " ")
-        + (object.form === "anyform" ? "object" : object.form);
-}
-
-function StringOrJoin(strings: string[]): string {
-    if (strings.length === 1) {
-        return strings[0];
-    }
-    let last = strings.splice(-1, 1)[0];
-    last = (strings.length > 1 ? ", or " : " or ") + last;
-    return strings.join(", ") + last;
-}
-
-function GroupBy<T>(values: T[], key: (value: T) => any) {
-    return values.reduce(function(accumulation, next) {
-        ((accumulation as any)[key(next)] = (accumulation as any)[key(next)] || []).push(next);
-        return accumulation;
-    }, {});
-}
-
-function GetSimple(object: Object): SimpleObject {
-    let obj = object;
-    while (obj instanceof RelativeObject) {
-        obj = obj.object;
-    }
-    return obj;
-}
 
 /**
  * Interpreter holds a world state and interprets commands based on it.
  * It can read the outputs of the grammar parser and convert them into DNFs for the planner.
  */
-class Interpreter {
+export class Interpreter {
     constructor(private world: WorldState) {
     }
 

@@ -2,8 +2,8 @@
 **/*.js
 **/*.js.map
 
-# Do not ignore changes in lib folder
-!lib/*
-
 # Ignore webstorm files
 /.idea/
+
+# Ignore libs
+/node_modules/

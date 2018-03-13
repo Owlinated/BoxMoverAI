@@ -1,4 +1,4 @@
-import "../lib/jquery";
+import "jquery";
 import {ExampleWorlds} from "../world/ExampleWorlds";
 import {SVGWorld} from "../world/SVGWorld";
 import {World} from "../world/World";
