@@ -4,6 +4,12 @@ import {NodeLowLevel} from "./PlannerLowLevel";
 import {DNFFormula} from "../core/Types";
 import {WorldState} from "../world/World";
 
+/**
+ * A high level graph of large goals which are represented by goal nodes. this
+ * graph contains high level nodes which represent the current world state and
+ * goal that needs to be fulfilled.
+ * @param dnf The DNF that graph is supposed to fulfill.
+ */
 export class GraphHighLevel implements Graph<NodeHighLevel> {
     public goalTreeRoot: DnfGoal;
 
@@ -24,6 +30,12 @@ export class GraphHighLevel implements Graph<NodeHighLevel> {
     }
 }
 
+/**
+ * Wraps the goal and worldstate. Uses incrementing ids as keys.
+ * @param goalNode     The goal that needs to be fulfilled.
+ * @param nodeLowLevel Represents the world state and is used for all low
+ *                     level searches.
+ */
 export class NodeHighLevel {
     private static counter = 0;
     private id: number;
@@ -36,6 +48,10 @@ export class NodeHighLevel {
         return this.getId().localeCompare(other.getId());
     }
 
+    /**
+     * Gets successors of a goal by evaluating it with the current world state.
+     * @return Returns the succesors.
+     */
     public successors(): Array<Successor<NodeHighLevel>> {
         const result: Array<Successor<NodeHighLevel>> = [];
         const goals = this.goalNode.getChildren(this.nodeLowLevel, false);
@@ -63,6 +79,6 @@ export class NodeHighLevel {
     }
 
     public toSuccessor(): Successor<NodeHighLevel> {
-        return {child: this, cost: 0, action: "asdf"};
+        return {child: this, cost: 0, action: ""};
     }
 }

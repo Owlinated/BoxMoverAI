@@ -89,7 +89,7 @@ export function interpret(
     }
 
     // Resolve ambiguities
-    const result = resolveParseAmbiguities(possibleParses, clarifications.slice(), interpreter);
+    const result = resolveParseAmbiguities(possibleParses, clarifications.slice());
 
     // Run interpretation
     result.interpretation = interpreter.interpretCommand(result.parse, clarifications);
@@ -290,8 +290,8 @@ export class Interpreter {
 
     /**
      * Interpret a location consisting of a relation to an entity
-     * @param {Location} location: The location as parsed by the grammar
-     * @returns {LocationSemantics} The location to build a DNF from
+     * @param location: The location as parsed by the grammar
+     * @returns: The location to build a DNF from
      */
     public static interpretLocation(location: Location, clarifications: Clarification[][], world: WorldState)
         : LocationSemantics {
@@ -312,8 +312,8 @@ export class Interpreter {
 
     /**
      * Interpret an entity with relation and object
-     * @param {Entity} ent: The entity as parsed by the grammar
-     * @returns {EntitySemantics}: The entity to build a DNF from
+     * @param ent: The entity as parsed by the grammar
+     * @returns: The entity to build a DNF from
      */
     public static interpretEntity(ent: Entity, clarifications: Clarification[][], world: WorldState): EntitySemantics {
         switch (ent.quantifier) {
@@ -341,8 +341,8 @@ export class Interpreter {
 
     /**
      * Get all objects within the world, that match the properties of the filter object
-     * @param {Object} filter The object used to filter by
-     * @returns {SimpleObject[]} List of all matching simple objects
+     * @param filter: The object used to filter by
+     * @returns: List of all matching simple objects
      */
     public static getObjects(filter: Object, clarifications: Clarification[][], world: WorldState): SimpleObject[] {
         return Interpreter.getSimpleObjects(world).filter((object) =>
@@ -351,8 +351,8 @@ export class Interpreter {
 
     /**
      * Filter objects by matching the properties of the filter object
-     * @param {Object} filter The object used to filter by
-     * @returns {SimpleObject[]} List of all matching simple objects
+     * @param filter: The object used to filter by
+     * @return: List of all matching simple objects
      */
     public static matchObject(filter: Object, object: SimpleObject, clarifications: Clarification[][], world: WorldState): boolean {
         if (filter instanceof SimpleObject) {
@@ -375,8 +375,8 @@ export class Interpreter {
 
     /**
      * Resolve ambiguities between different simple objects
-     * @param {SimpleObject[]} objects: Possible objects
-     * @returns {SimpleObject} The object desired by the user
+     * @param objects: Possible objects
+     * @returns: The object desired by the user
      */
     public static resolveAmbiguity(objects: SimpleObject[], clarifications: Clarification[][], world: WorldState)
         : SimpleObject {
@@ -413,8 +413,8 @@ export class Interpreter {
 
     /**
      * Checks if a literal complies with rules
-     * @param {Literal} literal: The literal to check
-     * @returns {boolean} True if literal is allowed by rules, false otherwise
+     * @param literal: The literal to check
+     * @returns: True if literal is allowed by rules, false otherwise
      */
     public static isLiteralValid(literal: Literal, world: WorldState): boolean {
         // Cannot manipulate the floor
@@ -496,7 +496,7 @@ export class Interpreter {
 
     /**
      * Get all objects within the world
-     * @returns {SimpleObject[]} List of all simple objects
+     * @returns: List of all simple objects
      */
     public static getSimpleObjects(world: WorldState): SimpleObject[] {
         const array: SimpleObject[] = [];
@@ -550,9 +550,9 @@ export class Interpreter {
 
     /**
      * Interpret a location consisting of a relation to an entity
-     * @param {SimpleObject[]} objects: Objects to filter by location
-     * @param {Location} filter: The location as parsed by the grammar
-     * @returns {LocationSemantics} The objects that are in the described location
+     * @param objects: Objects to filter by location
+     * @param filter: The location as parsed by the grammar
+     * @returns: The objects that are in the described location
      */
     public static matchLocation(filter: LocationSemantics, object: SimpleObject, world: WorldState): boolean {
         const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
@@ -578,8 +578,8 @@ export class Interpreter {
 
     /**
      * Lookup an objects name in the world
-     * @param {SimpleObject} obj: The object to look up
-     * @returns {string} The name given to the object in the world
+     * @param obj: The object to look up
+     * @returns: The name given to the object in the world
      */
     public static getObjectName(obj: SimpleObject, world: WorldState): string {
         if (obj === Interpreter.floor) {
@@ -597,8 +597,8 @@ export class Interpreter {
 
     /**
      * Lookup an objects by its name in the world
-     * @param {SimpleObject} name: The name of the object to look up
-     * @returns {string} The object matching the name
+     * @param name: The name of the object to look up
+     * @returns: The object matching the name
      */
     public static getObject(name: string, world: WorldState): SimpleObject {
         if (name === "floor") {
@@ -609,8 +609,8 @@ export class Interpreter {
 
     /**
      * Get number of stack containing object
-     * @param {SimpleObject} object: Object to get stack for
-     * @returns {number | undefined} The identifier of the stack containing object
+     * @param object: Object to get stack for
+     * @returns: The identifier of the stack containing object
      * or undefined if no stack contains object
      */
     public static getStackId(object: SimpleObject, world: WorldState): number | undefined {

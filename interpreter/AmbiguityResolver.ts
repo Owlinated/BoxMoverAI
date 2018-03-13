@@ -15,9 +15,16 @@ import {
 import {AmbiguityError} from "./AmbiguityError";
 import {Interpreter} from "./Interpreter";
 
+
+/**
+ * Consumes possible interpretations and applies clarifications to resolve ambiguities.
+ * May ask for more clarifications by throwing an error.
+ * @param  possibleParses The different parses to choose from.
+ * @param  clarifications The clarifications of the parses.
+ * @return                Returns the only possible parse.
+ */
 export function resolveParseAmbiguities(possibleParses: ShrdliteResult[],
-                                 clarifications: Clarification[][],
-                                 interpreter: Interpreter): ShrdliteResult {
+                                 clarifications: Clarification[][]): ShrdliteResult {
     let ambiguousObjects: Array<{ parse: ShrdliteResult, entity: Entity }> = [];
     for (const parse of possibleParses) {
         if (parse.parse instanceof MoveCommand) {
@@ -59,6 +66,12 @@ export function resolveParseAmbiguities(possibleParses: ShrdliteResult[],
     throw new AmbiguityError(`Do you want me to move ${objectsDescription}?`);
 }
 
+/**
+ * Makes sure that entity has all properties of filter.
+ * @param filter: The entity we are using to filter.
+ * @param entity: The entity we are testing.
+ * @returns: False if entity has properties different from filter.
+ */
 function isEntityMatch(filter: Entity, entity: Entity): boolean {
     if (entity.quantifier !== filter.quantifier) {
         return false;
@@ -66,6 +79,13 @@ function isEntityMatch(filter: Entity, entity: Entity): boolean {
     return isObjectMatch(filter.object, entity.object);
 }
 
+/**
+ * Makes sure that object has all the properties of filter.
+ *
+ * @param filter: The object we are using to filter.
+ * @param object: The object we want to test.
+ * @returns: False if object has properties different from filter.
+ */
 function isObjectMatch(filter: Object, object: Object): boolean {
     if (filter instanceof SimpleObject) {
         object = GetSimple(object);
@@ -93,6 +113,13 @@ function isObjectMatch(filter: Object, object: Object): boolean {
     }
 }
 
+ /**
+  * Makes sure that location has all the properties of filter
+  *
+  * @param filter: The entity we are using to filter
+  * @param location: The entity we want to test.
+  * @returns: False if location has properties different from filter.
+  */
 function isLocationMatch(filter: Location, location: Location): boolean {
     if (location.relation !== filter.relation) {
         return false;

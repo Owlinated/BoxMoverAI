@@ -4,26 +4,10 @@ import {aStarSearch} from "./AStarSearch";
 import {Graph, Successor} from "./Graph";
 
 /**
- * The core planner method.
- * Note that you should not change the API (type) of this method, only its body.
- * This method should call the A* search implementation with
- * your implementation of the ShrdliteGraph.
- *
- * @param interpretation: The logical interpretation of the user's desired goal.
- * @returns: A plan, represented by a list of strings.
- *           If there's a planning error, it throws an error with a string description.
+ * A graph representing possible arm movements.
  */
-export function makePlan(interpretation: DNFFormula,
-                         goal: (n: NodeLowLevel) => boolean,
-                         heuristics: (n: NodeLowLevel) => number,
-                         world: WorldState): string[] {
-    const search = aStarSearch(new GraphLowLevel(), NodeLowLevel.fromWorld(world), goal, heuristics, 10);
-    const result = search.path.map((node) => node.action);
-    result.push(`Path with ${search.path.length} moves (${search.visited} visited nodes)`);
-    return result;
-}
-
 export class GraphLowLevel implements Graph<NodeLowLevel> {
+    // Gets succesors for each possible arm movement.
     public successors(current: NodeLowLevel): Array<Successor<NodeLowLevel>> {
         const result = [];
         const actions = ["l", "r", "p", "d"];
@@ -42,6 +26,13 @@ export class GraphLowLevel implements Graph<NodeLowLevel> {
     }
 }
 
+/**
+ * Wraps the current world state. Can simulate arm movements.
+ * @param stacks  The stacks of the world.
+ * @param holding The item that the arm is holding.
+ * @param arm     The position of the arm.
+ * @param world   The original world state.
+ */
 export class NodeLowLevel {
     // String identifier for efficient comparison
     public id: string = "";
@@ -73,6 +64,11 @@ export class NodeLowLevel {
         return this.id.localeCompare(other.id);
     }
 
+    /**
+     * Simulates arm movements.
+     * @param  action The action that the arm should take.
+     * @return        True if move has been executed, false otherwise.
+     */
     public updateState(action: Action): boolean {
         switch (action) {
             // Move arm left
@@ -135,6 +131,12 @@ export class NodeLowLevel {
     }
 }
 
+/**
+ * Checks if we can place an item ontop of another item
+ * @param  objectA The item we want to place.
+ * @param  objectB The item we want to place items on.
+ * @return         Returns true if possible, false otherwise.
+ */
 export function canPlace(objectA: SimpleObject, objectB: SimpleObject): boolean {
     if (objectA === undefined) {
         // We cannot move the floor

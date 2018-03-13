@@ -3,6 +3,12 @@ import {Conjunction, DNFFormula, Literal, Relation, SimpleObject} from "../core/
 import {aStarSearch} from "./AStarSearch";
 import {canPlace, GraphLowLevel, NodeLowLevel} from "./PlannerLowLevel";
 
+/**
+ * Node of the tree describing the problem to be solved. Provides methods for
+ * tree search, high level nodes use this for the solution search.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal.
+ */
 export abstract class NodeGoal {
     public children: NodeGoal[] = [];
     public abstract evaluate: (state: NodeLowLevel) =>
@@ -13,6 +19,12 @@ export abstract class NodeGoal {
 
     public constructor(public heuristicParent: NodeGoal | undefined, public descriptionParent: NodeGoal | undefined) {}
 
+    /**
+     * Gets the children of this node.
+     * @param  state State to check if goals are fulfilled.
+     * @param  up    Direction of tree traversal.
+     * @return       The next goal nodes.
+     */
     public getChildren(state: NodeLowLevel, up: boolean): NodeGoal[] {
         if (this.precondition) {
             if (up) {
@@ -33,6 +45,12 @@ export abstract class NodeGoal {
         return result;
     }
 
+    /**
+     * Find way to satisfy the current goal by running a low level search.
+     * @param  state The current state used for calculating a heuristic
+     *               and checking if the goal is fulfilled.
+     * @return       The result of the low level search.
+     */
     public evaluateLowLevel(state: NodeLowLevel)
         : {success: boolean, cost: number, path: string, state: NodeLowLevel | undefined} {
         if (this.isFulfilled(state)) {
@@ -54,19 +72,39 @@ export abstract class NodeGoal {
         };
     }
 
+    /**
+     * Skip over the current node instead of evaluating it.
+     * @param  state Required by interface
+     * @return       Required by interface
+     */
     public evaluateSkip(state: NodeLowLevel)
         : {success: boolean, cost: number, path: string, state: NodeLowLevel | undefined} {
         return {success: true, cost: 1, path: "", state: undefined};
     }
 
+    /**
+     * Checks if all children are fulfilled.
+     * @param  state The state we use to check if a goal is fulfilled.
+     * @return       Returns true if every child is fulfilled, false otherwise.
+     */
     public allFulfilled(state: NodeLowLevel): boolean {
         return this.children.every((child) => child.isFulfilled(state));
     }
 
+    /**
+     * Checks if any child is fulfilled.
+     * @param  state The state we use to check if a goal is fulfilled.
+     * @return       Returns true if any of the children are fulfilled, false otherwise.
+     */
     public someFulfilled(state: NodeLowLevel): boolean {
         return this.children.some((child) => child.isFulfilled(state));
     }
 
+    /**
+     * Add a child that will be evaluated after this node and its children.
+     * @param  create Creates a child with the given parent.
+     * @return        Returns the created child.
+     */
     public appendChild(create: (parent: NodeGoal) => NodeGoal) {
         let node: NodeGoal = this;
         while (node.children.length > 0) {
@@ -77,18 +115,37 @@ export abstract class NodeGoal {
         return result;
     }
 
-    // Get this nodes heuristic
+    /**
+     * Get the estimated cost to fulfill this goal.
+     * @param  state The state used to estimated the goal.
+     * @return       Returns the heuristic.
+     */
     public abstract getHeuristic(state: NodeLowLevel): number;
 
-    // Get heuristic of all necessary paths up to root
+    /**
+     * Get the heuristic of all nodes up to the root.
+     * @param  state The state used to estimate all the heuristics.
+     * @return       Returns the sum of heuristics.
+     */
     public getHeuristicUp(state: NodeLowLevel): number {
         return this.getHeuristic(state)
             + (this.heuristicParent === undefined ? 0 : this.heuristicParent!.getHeuristicUp(state));
     }
 
+    /**
+     * Explain what the current goal is trying to achieve.
+     * @param  previous The childs explanation.
+     * @param  state    The state used to get objects from.
+     * @return          Human readable explanation.
+     */
     public abstract explain(previous: string, state: NodeLowLevel): string;
 }
 
+/**
+ * Base class for all goals which consist of other goals.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal.
+ */
 export abstract class CompositeGoal extends NodeGoal {
     public evaluate = this.evaluateSkip;
     public isFulfilled = this.allFulfilled;
@@ -100,10 +157,15 @@ export abstract class CompositeGoal extends NodeGoal {
     }
 
     public getHeuristic(state: NodeLowLevel): number {
+        // Since this node only discovers goals it does not
+        // have a heuristic by itself.
         return 0;
     }
 }
 
+/**
+ * The final node, when this node is reached, the search has succeeded.
+ */
 export class FinalNode extends NodeGoal {
     public evaluate = this.evaluateSkip;
     public isFulfilled = (state: NodeLowLevel) => true;
@@ -117,6 +179,10 @@ export class FinalNode extends NodeGoal {
     }
 }
 
+/**
+ * Represents the entire DNF being fulfilled.
+ * @param dnf The DNF formula that we want to fulfill.
+ */
 export class DnfGoal extends NodeGoal {
     public evaluate = this.evaluateSkip;
     public isFulfilled = this.someFulfilled;
@@ -127,6 +193,13 @@ export class DnfGoal extends NodeGoal {
         this.children = dnf.conjuncts.map((conjunction) => new ConjunctionGoal(conjunction, this, this));
     }
 
+    /**
+     * Gets the children of this node, if every child is fulfilled, the final node
+     * is returned to indicate that the search is over.
+     * @param  state The state used to test if children are fulfilled.
+     * @param  up    The direction of the tree traversal.
+     * @return       Returns unfulfilled children or final node.
+     */
     public getChildren(state: NodeLowLevel, up: boolean): NodeGoal[] {
         if (this.isFulfilled(state)) {
             return [new FinalNode(this, this)];
@@ -138,17 +211,29 @@ export class DnfGoal extends NodeGoal {
         return 0;
     }
 
+    //The root of the explanation, "I do something.".
     public explain(previous: string, state: NodeLowLevel): string {
         return `I ${previous}.`;
     }
 }
 
+/**
+ * Represents the conjunction term of the DNF.
+ * @param conjunction       The conjuction of the DNF.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal.
+ */
 export class ConjunctionGoal extends CompositeGoal {
     public constructor(public conjunction: Conjunction, heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
         super(heuristicParent, descriptionParent);
         this.children = conjunction.literals.map((literal) => this.create(literal));
     }
 
+    /**
+     * Creates children for each type of literal in the conjunction.
+     * @param  literal The literal to create a node for.
+     * @return         Returns the created node.
+     */
     private create(literal: Literal): NodeGoal {
         if (literal.relation === "holding") {
             return new PickUpGoal(literal.args[0], this, this);
@@ -186,6 +271,12 @@ export class ConjunctionGoal extends CompositeGoal {
 // Composite Goals //
 /////////////////////
 
+/**
+ * Clears the stack above the item we want to pick up and then picks it up.
+ * @param item              The item we want to pick up.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal.
+ */
 export class PickUpGoal extends CompositeGoal {
     public constructor(public item: string, heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
         super(heuristicParent, descriptionParent);
@@ -201,6 +292,15 @@ export class PickUpGoal extends CompositeGoal {
     }
 }
 
+/**
+ * Either moves item to goal using relationA or moves goal to item using relation B.
+ * @param item              The item we want to move/move to.
+ * @param goal              The goal we want to move/move to.
+ * @param relationA         The relation for item to goal.
+ * @param relationB         The relation for goal to item.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 class MoveBidirectionalGoal extends NodeGoal {
     public evaluate = this.evaluateSkip;
     public isFulfilled = this.someFulfilled;
@@ -227,6 +327,15 @@ class MoveBidirectionalGoal extends NodeGoal {
     }
 }
 
+/**
+ * Moves an item to a stack, ignoring the position within the stack. For relations
+ * like beside, left of, right of.
+ * @param item              The item we want to move.
+ * @param goal              The stack we want the item to be in relation with.
+ * @param relation          The relation we want the item and goal to be in.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 class MoveToStackGoal extends CompositeGoal {
     public constructor(public item: string,
                        public goal: string,
@@ -242,6 +351,10 @@ class MoveToStackGoal extends CompositeGoal {
         this.isFulfilled = onStackGoal.isFulfilled;
     }
 
+    /**
+     * Functions to produce functions which checks if a specific stack is in
+     * relation with the goal item.
+     */
     private stackCheck: { [relation: string]: (goal: string) => (stackId: number, state: NodeLowLevel) => boolean } = {
         rightof: (goal: string) => (stackId: number, state: NodeLowLevel) => {
             const stacks = state.stacks.filter((stack) => stack.indexOf(goal) >= 0);
@@ -265,6 +378,14 @@ class MoveToStackGoal extends CompositeGoal {
     }
 }
 
+/**
+ * Move an item ontop of a goal by clearing the stack of the goal, picking the item
+ * up and moving it ontop of the goal.
+ * @param item              The item we want to move.
+ * @param goal              The goal to move the item ontop of.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 class MoveOnTopGoal extends CompositeGoal {
     public constructor(public item: string,
                        public goal: string,
@@ -286,6 +407,14 @@ class MoveOnTopGoal extends CompositeGoal {
     }
 }
 
+/**
+ * Moves an item above a goal by widening the surface area of the target stack,
+ * picking them item up and moving it above the goal.
+ * @param item              The item we want to move.
+ * @param goal              The goal we want to move the item above.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 class MoveAboveGoal extends CompositeGoal {
     public constructor(public item: string,
                        public goal: string,
@@ -294,7 +423,7 @@ class MoveAboveGoal extends CompositeGoal {
         super(heuristicParent, descriptionParent);
         this.precondition = true;
         const widen = this.appendChild((parent) => new WidenStackGoal(item, goal, parent, this));
-        // const pick = this.appendChild((parent) => new PickUpGoal(item, parent, this));
+        const pick = this.appendChild((parent) => new PickUpGoal(item, parent, this));
         const sameStackGoal =
             this.appendChild((parent) => new SameStackGoal(item, "above", goal, parent, this));
         this.isFulfilled = sameStackGoal.isFulfilled;
@@ -311,6 +440,12 @@ class MoveAboveGoal extends CompositeGoal {
 // Basic Goals //
 /////////////////
 
+/**
+ * Makes sure that the arm is holding the item.
+ * @param item              The item the arm should hold.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 export class HoldingGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
     public isFulfilled = (state: NodeLowLevel) => state.holding === this.item;
@@ -319,6 +454,12 @@ export class HoldingGoal extends NodeGoal {
         super(heuristicParent, descriptionParent);
     }
 
+    /**
+     * Gets the distance between the current position of the arm and the
+     * position of the item.
+     * @param  state The state to determine the heuristic for.
+     * @return       Returns the estimated cost.
+     */
     public getHeuristic(state: NodeLowLevel): number {
         if (this.isFulfilled(state)) {
             return 0;
@@ -339,6 +480,13 @@ export class HoldingGoal extends NodeGoal {
     }
 }
 
+/**
+ * Checks if the item is on the goal stack.
+ * @param item             The item we want to check.
+ * @param stackValid       Check if the stack is a goal stack.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 export class OnStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
     public isFulfilled = (state: NodeLowLevel) => {
@@ -355,6 +503,11 @@ export class OnStackGoal extends NodeGoal {
         super(heuristicParent, descriptionParent);
     }
 
+    /**
+     * Find the distance to the closest stack that is a goal stack.
+     * @param  state The state to determine the heuristic for.
+     * @return       Returns the estimated cost.
+     */
     public getHeuristic(state: NodeLowLevel): number {
         if (this.isFulfilled(state)) {
             return 0;
@@ -372,8 +525,16 @@ export class OnStackGoal extends NodeGoal {
     }
 }
 
+/**
+ * Widens the surface of a stack to support the item.
+ * @param item              The item that needs to be supported.
+ * @param goal              The goal with the stack that needs to be widened.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 export class WidenStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
+    // Checks if item can be placed ontop of the stack.
     public isFulfilled = (state: NodeLowLevel) => {
         if (this.goal === "floor") {
             return true;
@@ -398,6 +559,12 @@ export class WidenStackGoal extends NodeGoal {
         super(heuristicParent, descriptionParent);
     }
 
+    /**
+     * Find the number of items that need to be added ontop of the goal stack
+     * to be able to support item.
+     * @param  state The state to determine the heuristic for.
+     * @return       Returns the estimated cost.
+     */
     public getHeuristic(state: NodeLowLevel): number {
         if (this.isFulfilled(state)) {
             return 0;
@@ -442,8 +609,17 @@ export class WidenStackGoal extends NodeGoal {
     }
 }
 
+/**
+ * Checks if two items are on the same stack in a specific relation.
+ * @param item              The item that we want to check.
+ * @param relation          The relation item and goal need to be in.
+ * @param goal              The goal we check against.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal.
+ */
 export class SameStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
+    // Tests if item and goal are in a specific relation
     public isFulfilled = (state: NodeLowLevel) => {
         const stacksA = state.stacks.filter((stack) => stack.indexOf(this.item) >= 0);
         if (stacksA.length === 0) {
@@ -489,6 +665,11 @@ export class SameStackGoal extends NodeGoal {
         super(heuristicParent, descriptionParent);
     }
 
+    /**
+     * Gets the distance between the item and the goal.
+     * @param  state The state to determine the heuristic for.
+     * @return       Returns the estimated cost.
+     */
     public getHeuristic(state: NodeLowLevel): number {
         if (this.isFulfilled(state)) {
             return 0;
@@ -507,8 +688,15 @@ export class SameStackGoal extends NodeGoal {
     }
 }
 
+/**
+ * Clears the stack above item.
+ * @param item              The item we want to free.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal.
+ */
 export class ClearStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
+    // Check if the item is free.
     public isFulfilled = (state: NodeLowLevel) => {
         if (this.item === "floor") {
             return state.world.stacks.some((stack) => stack.length === 0);
@@ -524,6 +712,11 @@ export class ClearStackGoal extends NodeGoal {
         super(heuristicParent, descriptionParent);
     }
 
+    /**
+     * Count the number of items above item.
+     * @param  state The state to determine the heuristic for.
+     * @return       Returns the estimated cost.
+     */
     public getHeuristic(state: NodeLowLevel): number {
         if (this.isFulfilled(state)) {
             return 0;
@@ -556,6 +749,13 @@ export class ClearStackGoal extends NodeGoal {
     }
 }
 
+/**
+ * Makes sure that we can place item ontop of any goal stack.
+ * @param item              The item we want to check.
+ * @param stackValid        Check if the stack is a goal stack.
+ * @param heuristicParent   Parent whose heuristic should be taken into consideration.
+ * @param descriptionParent Parent to ask for descriptions of the goal
+ */
 export class ClearOnStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
     public isFulfilled = (state: NodeLowLevel) => {
@@ -571,6 +771,11 @@ export class ClearOnStackGoal extends NodeGoal {
         super(heuristicParent, descriptionParent);
     }
 
+    /**
+     * Finds the distance to closest stack that item can be placed on.
+     * @param  state The state to determine the heuristic for.
+     * @return       Returns the estimated cost.
+     */
     public getHeuristic(state: NodeLowLevel): number {
         if (this.isFulfilled(state)) {
             return 0;

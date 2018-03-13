@@ -4,6 +4,12 @@ import {Entity, Location, Object, RelativeObject, SimpleObject} from "./Types";
 import {WorldState} from "../world/World";
 import {NodeLowLevel} from "../planner/PlannerLowLevel";
 
+/**
+ * Describe objects based on their form.
+ *
+ * @param objects: An array of the objects we want to list.
+ * @returns: A string that describes the form of each object.
+ */
 export function ListObjects(objects: Object[]): string {
     if (objects.length === 0) {
         throw new Error("Objects cannot be empty");
@@ -19,6 +25,13 @@ export function ListObjects(objects: Object[]): string {
     return result;
 }
 
+/**
+ * Describe objects based on their color.
+ *
+ * @param objects: An array of the objects we want to list.
+ * @param description: A description of the form of the object.
+ * @returns: A string that describes the color of each object.
+ */
 function ListObjectsByColor(objects: Object[], description: string): string {
     if (objects.length === 0) {
         throw new Error("Objects cannot be empty");
@@ -34,6 +47,12 @@ function ListObjectsByColor(objects: Object[], description: string): string {
     return ` ${StringOrJoin(terms)}`;
 }
 
+/**
+ * Describe objects based on their size.
+ * @param  objects     An array of the objects we want to list.
+ * @param  description A description of the colour of the object.
+ * @return: A string that describes the size of each object.
+ */
 function ListObjectsBySize(objects: Object[], description: string): string {
     if (objects.length === 0) {
         throw new Error("Objects cannot be empty");
@@ -48,6 +67,13 @@ function ListObjectsBySize(objects: Object[], description: string): string {
     return ` the ${StringOrJoin(terms)} ${description}`;
 }
 
+/**
+* Describe objects based on their location.
+*
+* @param objects: An array of the objects we want to list.
+* @param description: A description of the size of the object.
+* @returns: A string that describes the location that each object is in.
+*/
 function ListObjectsByLocation(objects: Object[], description: string): string {
     if (objects.length === 0) {
         throw new Error("Objects cannot be empty");
@@ -64,6 +90,11 @@ function ListObjectsByLocation(objects: Object[], description: string): string {
     return `${description} ${terms.join(" or the one ")}`;
 }
 
+/**
+ * Describe location in human readable form.
+ * @param  location The location to describe.
+ * @return          The description of the location.
+ */
 function DescribeLocation(location: Location): string {
     if (location.relation === "at any location") {
         return location.relation;
@@ -74,15 +105,32 @@ function DescribeLocation(location: Location): string {
     return `that is ${location.relation} ${DescribeEntity(location.entity)}`;
 }
 
+/**
+ * Describe an entity in human readable form.
+ * @param  entity The entity to describe.
+ * @return        The entitys description.
+ */
 function DescribeEntity(entity: Entity): string {
     return `${entity.quantifier} ${DescribeObject(entity.object)}`;
 }
 
+/**
+ * Describes an object using the world state.
+ * @param  object The name of the object to describe.
+ * @param  state  The state we get the object from.
+ * @return        The description of the object.
+ */
 export function DescribeObjectState(object: string, state: NodeLowLevel): string {
     const simpleObject = state.world.objects[object];
     return DescribeSimpleObject(simpleObject);
 }
 
+/**
+ * Desribes an object in human readable form by splitting RelativeObjects
+ * into SimpleObjects and locations.
+ * @param  object The object we want to describe.
+ * @return        The description of the object.
+ */
 export function DescribeObject(object: Object): string {
     const locations: Location[] = [];
     let relativeObject = object;
@@ -93,12 +141,22 @@ export function DescribeObject(object: Object): string {
     return `${DescribeSimpleObject(relativeObject)} ${locations.map(DescribeLocation).join(" ")}`;
 }
 
+/**
+ * Describes a SimpleObject in human readable form.
+ * @param  object The object we want to describe.
+ * @return        The description of the object.
+ */
 function DescribeSimpleObject(object: SimpleObject): string {
     return (object.size === null ? "" : object.size + " ")
         + (object.color === null ? "" : object.color + " ")
         + (object.form === "anyform" ? "object" : object.form);
 }
 
+/**
+ * Joins a set of strings seperated by or.
+ * @param  strings The strings we want to seperate.
+ * @return         Or seperated strings. e.g. [ball, box, plank] => Ball, box, or plank.
+ */
 function StringOrJoin(strings: string[]): string {
     if (strings.length === 1) {
         return strings[0];
@@ -107,4 +165,3 @@ function StringOrJoin(strings: string[]): string {
     last = (strings.length > 1 ? ", or " : " or ") + last;
     return strings.join(", ") + last;
 }
-
