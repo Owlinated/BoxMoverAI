@@ -1,6 +1,7 @@
 # Ignore generated js and js.map files
 **/*.js
 **/*.js.map
+# Except for webpack configuration
 !webpack.config.js
 
 # Ignore webstorm files

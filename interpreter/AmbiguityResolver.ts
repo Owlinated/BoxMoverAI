@@ -10,11 +10,9 @@ import {
     RelativeObject,
     ShrdliteResult,
     SimpleObject,
-    TakeCommand
+    TakeCommand,
 } from "../core/Types";
 import {AmbiguityError} from "./AmbiguityError";
-import {Interpreter} from "./Interpreter";
-
 
 /**
  * Consumes possible interpretations and applies clarifications to resolve ambiguities.
@@ -24,7 +22,7 @@ import {Interpreter} from "./Interpreter";
  * @return                Returns the only possible parse.
  */
 export function resolveParseAmbiguities(possibleParses: ShrdliteResult[],
-                                 clarifications: Clarification[][]): ShrdliteResult {
+                                        clarifications: Clarification[][]): ShrdliteResult {
     let ambiguousObjects: Array<{ parse: ShrdliteResult, entity: Entity }> = [];
     for (const parse of possibleParses) {
         if (parse.parse instanceof MoveCommand) {
@@ -34,13 +32,14 @@ export function resolveParseAmbiguities(possibleParses: ShrdliteResult[],
         } else if (parse.parse instanceof DropCommand) {
             // Describe the object being held in terms of an entity
             ambiguousObjects.push({
-                parse, entity:
+                entity:
                     new Entity("the",
                         new RelativeObject(
                             new SimpleObject("anyform", null, null),
                             new Location("holding",
                                 new Entity("the",
-                                    new SimpleObject("anyform", null, null)))))
+                                    new SimpleObject("anyform", null, null))))),
+                parse,
             });
         } else {
             throw Error(`Unexpected ambiguity in ${parse}`);

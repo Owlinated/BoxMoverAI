@@ -1,7 +1,7 @@
 import {Object, RelativeObject, SimpleObject} from "./Types";
 
 export function GroupBy<T>(values: T[], key: (value: T) => any) {
-    return values.reduce(function (accumulation, next) {
+    return values.reduce((accumulation, next) => {
         ((accumulation as any)[key(next)] = (accumulation as any)[key(next)] || []).push(next);
         return accumulation;
     }, {});

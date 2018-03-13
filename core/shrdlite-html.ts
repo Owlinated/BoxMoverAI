@@ -14,7 +14,7 @@ import {parseUtteranceIntoPlan, splitStringIntoPlan} from "./Shrdlite";
 const defaultWorld = "small";
 const defaultSpeech = true;
 
-$(function() {
+$(() => {
     let current: string = getURLParameter("world");
     if (!(current in ExampleWorlds)) {
         current = defaultWorld;

@@ -10,7 +10,7 @@
   "scripts": {
     "nearley": "nearleyc ./parser/Grammar.ne > ./parser/Grammar.ts",
     "start": "npm run nearley && webpack && opn http://localhost:8080/dist/shrdlite.html && webpack-serve",
-    "startoffline": "npm run nearley && tsc && node ./core/shrdlite-offline.js"
+    "offline": "npm run nearley && tsc && node ./core/shrdlite-offline.js"
   },
   "repository": {
     "type": "git",

@@ -1,5 +1,5 @@
 import {Set} from "typescript-collections";
-import {Graph, Successor} from "./Graph";
+import {IGraph, Successor} from "./Graph";
 
 /*
  * GridGraph
@@ -38,7 +38,7 @@ export class GridNode {
 /**
  * An implementation of a 2d grid graph.
  */
-export class GridGraph implements Graph<GridNode> {
+export class GridGraph implements IGraph<GridNode> {
     public static readonly actions: {[s: string]: [number, number]}
         = {L: [-1, 0], R: [+1, 0], D: [0, -1], U: [0, +1]};
 

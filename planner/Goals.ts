@@ -66,8 +66,8 @@ export abstract class NodeGoal {
         actions.unshift(this.explain("", state));
 
         return {
-            success: search.status === "success",
             cost: search.cost, path: actions.join(";"),
+            success: search.status === "success",
             state: search.path.length > 0 ? search.path[search.path.length - 1].child : undefined
         };
     }
@@ -211,7 +211,7 @@ export class DnfGoal extends NodeGoal {
         return 0;
     }
 
-    //The root of the explanation, "I do something.".
+    // The root of the explanation, "I do something.".
     public explain(previous: string, state: NodeLowLevel): string {
         return `I ${previous}.`;
     }
@@ -227,6 +227,10 @@ export class ConjunctionGoal extends CompositeGoal {
     public constructor(public conjunction: Conjunction, heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
         super(heuristicParent, descriptionParent);
         this.children = conjunction.literals.map((literal) => this.create(literal));
+    }
+
+    public explain(previous: string, state: NodeLowLevel): string {
+        return this.descriptionParent!.explain(previous, state);
     }
 
     /**
@@ -260,10 +264,6 @@ export class ConjunctionGoal extends CompositeGoal {
             default:
                 throw new Error(`Unknown relation: ${literal.relation}`);
         }
-    }
-
-    public explain(previous: string, state: NodeLowLevel): string {
-        return this.descriptionParent!.explain(previous, state);
     }
 }
 
@@ -314,7 +314,7 @@ class MoveBidirectionalGoal extends NodeGoal {
         super(heuristicParent, descriptionParent);
         this.children = [
             new MoveToStackGoal(item, goal, relationA, this, this),
-            new MoveToStackGoal(goal, item, relationB, this, this)
+            new MoveToStackGoal(goal, item, relationB, this, this),
         ];
     }
 
@@ -337,6 +337,26 @@ class MoveBidirectionalGoal extends NodeGoal {
  * @param descriptionParent Parent to ask for descriptions of the goal
  */
 class MoveToStackGoal extends CompositeGoal {
+    /**
+     * Functions to produce functions which checks if a specific stack is in
+     * relation with the goal item.
+     */
+    private stackCheck: { [relation: string]: (goal: string) => (stackId: number, state: NodeLowLevel) => boolean } = {
+        beside: (goal: string) => (stackId: number, state: NodeLowLevel) => {
+            const stacks = state.stacks.filter((stack) => stack.indexOf(goal) >= 0);
+            return stacks.length === 0 ? false : (state.stacks.indexOf(stacks[0]) - 1 === stackId)
+                || (state.stacks.indexOf(stacks[0]) + 1 === stackId);
+        },
+        leftof: (goal: string) => (stackId: number, state: NodeLowLevel) => {
+            const stacks = state.stacks.filter((stack) => stack.indexOf(goal) >= 0);
+            return stacks.length === 0 ? false : state.stacks.indexOf(stacks[0]) > stackId;
+        },
+        rightof: (goal: string) => (stackId: number, state: NodeLowLevel) => {
+            const stacks = state.stacks.filter((stack) => stack.indexOf(goal) >= 0);
+            return stacks.length === 0 ? false : state.stacks.indexOf(stacks[0]) < stackId;
+        },
+    };
+
     public constructor(public item: string,
                        public goal: string,
                        public relation: Relation,
@@ -350,26 +370,6 @@ class MoveToStackGoal extends CompositeGoal {
             this.appendChild((parent) => new OnStackGoal(item, this.stackCheck[relation](goal), parent, this));
         this.isFulfilled = onStackGoal.isFulfilled;
     }
-
-    /**
-     * Functions to produce functions which checks if a specific stack is in
-     * relation with the goal item.
-     */
-    private stackCheck: { [relation: string]: (goal: string) => (stackId: number, state: NodeLowLevel) => boolean } = {
-        rightof: (goal: string) => (stackId: number, state: NodeLowLevel) => {
-            const stacks = state.stacks.filter((stack) => stack.indexOf(goal) >= 0);
-            return stacks.length === 0 ? false : state.stacks.indexOf(stacks[0]) < stackId;
-        },
-        leftof: (goal: string) => (stackId: number, state: NodeLowLevel) => {
-            const stacks = state.stacks.filter((stack) => stack.indexOf(goal) >= 0);
-            return stacks.length === 0 ? false : state.stacks.indexOf(stacks[0]) > stackId;
-        },
-        beside: (goal: string) => (stackId: number, state: NodeLowLevel) => {
-            const stacks = state.stacks.filter((stack) => stack.indexOf(goal) >= 0);
-            return stacks.length === 0 ? false : (state.stacks.indexOf(stacks[0]) - 1 === stackId)
-                || (state.stacks.indexOf(stacks[0]) + 1 === stackId);
-        }
-    };
 
     public explain(previous: string, state: NodeLowLevel): string {
         const appendix =
@@ -448,11 +448,12 @@ class MoveAboveGoal extends CompositeGoal {
  */
 export class HoldingGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
-    public isFulfilled = (state: NodeLowLevel) => state.holding === this.item;
 
     public constructor(public item: string, heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
         super(heuristicParent, descriptionParent);
     }
+
+    public isFulfilled = (state: NodeLowLevel) => state.holding === this.item;
 
     /**
      * Gets the distance between the current position of the arm and the
@@ -489,18 +490,24 @@ export class HoldingGoal extends NodeGoal {
  */
 export class OnStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
+
+    public constructor(public item: string,
+                       public stackValid: (stack: number, state: NodeLowLevel) => boolean,
+                       heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
+        super(heuristicParent, descriptionParent);
+    }
+
+    /**
+     * Test if the item is on a valid stack
+     * @param  state The state to check against.
+     * @returns      True if the item is on a valid stack, false otherwise
+     */
     public isFulfilled = (state: NodeLowLevel) => {
         const stacks = state.stacks.filter((stack) => stack.indexOf(this.item) >= 0);
         if (stacks.length === 0) {
             return false;
         }
         return this.stackValid(state.stacks.indexOf(stacks[0]), state);
-    }
-
-    public constructor(public item: string,
-                       public stackValid: (stack: number, state: NodeLowLevel) => boolean,
-                       heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
-        super(heuristicParent, descriptionParent);
     }
 
     /**
@@ -534,7 +541,19 @@ export class OnStackGoal extends NodeGoal {
  */
 export class WidenStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
-    // Checks if item can be placed ontop of the stack.
+
+    public constructor(public item: string,
+                       public goal: string,
+                       heuristicParent: NodeGoal,
+                       descriptionParent: NodeGoal) {
+        super(heuristicParent, descriptionParent);
+    }
+
+    /**
+     * Checks if item can be placed ontop of the stack.
+     * @param  state The state to check against.
+     * @returns      True if the item can be placed above the goal, false otherwise
+     */
     public isFulfilled = (state: NodeLowLevel) => {
         if (this.goal === "floor") {
             return true;
@@ -550,13 +569,6 @@ export class WidenStackGoal extends NodeGoal {
         const goalObject = state.world.objects[goalStack[goalStack.length - 1]];
         const itemObject = state.world.objects[this.item];
         return canPlace(itemObject, goalObject);
-    }
-
-    public constructor(public item: string,
-                       public goal: string,
-                       heuristicParent: NodeGoal,
-                       descriptionParent: NodeGoal) {
-        super(heuristicParent, descriptionParent);
     }
 
     /**
@@ -619,7 +631,19 @@ export class WidenStackGoal extends NodeGoal {
  */
 export class SameStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
-    // Tests if item and goal are in a specific relation
+
+    public constructor(public item: string,
+                       public relation: Relation,
+                       public goal: string,
+                       heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
+        super(heuristicParent, descriptionParent);
+    }
+
+    /**
+     * Tests if item and goal are in a specific relation
+     * @param  state The state to check against.
+     * @returns      True if the item is in a specific relation with goal, false otherwise
+     */
     public isFulfilled = (state: NodeLowLevel) => {
         const stacksA = state.stacks.filter((stack) => stack.indexOf(this.item) >= 0);
         if (stacksA.length === 0) {
@@ -658,13 +682,6 @@ export class SameStackGoal extends NodeGoal {
         }
     }
 
-    public constructor(public item: string,
-                       public relation: Relation,
-                       public goal: string,
-                       heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
-        super(heuristicParent, descriptionParent);
-    }
-
     /**
      * Gets the distance between the item and the goal.
      * @param  state The state to determine the heuristic for.
@@ -696,7 +713,16 @@ export class SameStackGoal extends NodeGoal {
  */
 export class ClearStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
-    // Check if the item is free.
+
+    public constructor(public item: string, heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
+        super(heuristicParent, descriptionParent);
+    }
+
+    /**
+     * Check if the item is free.
+     * @param  state The state to check against.
+     * @returns      True if the item is free, false otherwise
+     */
     public isFulfilled = (state: NodeLowLevel) => {
         if (this.item === "floor") {
             return state.world.stacks.some((stack) => stack.length === 0);
@@ -706,10 +732,6 @@ export class ClearStackGoal extends NodeGoal {
             return false;
         }
         return stacks[0].indexOf(this.item) === stacks[0].length - 1;
-    }
-
-    public constructor(public item: string, heuristicParent: NodeGoal, descriptionParent: NodeGoal) {
-        super(heuristicParent, descriptionParent);
     }
 
     /**
@@ -758,17 +780,23 @@ export class ClearStackGoal extends NodeGoal {
  */
 export class ClearOnStackGoal extends NodeGoal {
     public evaluate = this.evaluateLowLevel;
-    public isFulfilled = (state: NodeLowLevel) => {
-        const stacks = state.stacks.map((stack) => state.stacks.indexOf(stack))
-            .filter((stackId) => this.stackValid(stackId, state) && this.isClear(stackId, state));
-        return stacks.length > 0;
-    }
 
     public constructor(public item: string,
                        public stackValid: (stack: number, state: NodeLowLevel) => boolean,
                        heuristicParent: NodeGoal,
                        descriptionParent: NodeGoal) {
         super(heuristicParent, descriptionParent);
+    }
+
+    /**
+     * Checks if item can be placed ontop of a goal stack.
+     * @param  state The state to check against.
+     * @returns      True if the item can be placed above a goal stack, false otherwise
+     */
+    public isFulfilled = (state: NodeLowLevel) => {
+        const stacks = state.stacks.map((stack) => state.stacks.indexOf(stack))
+            .filter((stackId) => this.stackValid(stackId, state) && this.isClear(stackId, state));
+        return stacks.length > 0;
     }
 
     /**
@@ -799,6 +827,17 @@ export class ClearOnStackGoal extends NodeGoal {
         return Math.min.apply(Math, results);
     }
 
+    public explain(previous: string, state: NodeLowLevel): string {
+        const appendix = ` clear a stack for ${DescribeObjectState(this.item, state)}`;
+        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
+    }
+
+    /**
+     * Checks if a stack is empty, or can support the item
+     * @param stackId The stack to check.
+     * @param  state  The state to check against.
+     * @returns       True if the stack is empty or can support the item, false otherwise
+     */
     private isClear(stackId: number, state: NodeLowLevel): boolean {
         const dropStack = state.stacks[stackId];
         if (dropStack.length === 0) {
@@ -807,10 +846,5 @@ export class ClearOnStackGoal extends NodeGoal {
         const objectA = state.world.objects[this.item];
         const objectB = state.world.objects[dropStack[dropStack.length - 1]];
         return canPlace(objectA, objectB);
-    }
-
-    public explain(previous: string, state: NodeLowLevel): string {
-        const appendix = ` clear a stack for ${DescribeObjectState(this.item, state)}`;
-        return this.descriptionParent!.explain(previous ? `${previous} to ${appendix}` : appendix, state);
     }
 }

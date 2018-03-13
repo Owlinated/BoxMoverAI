@@ -1,8 +1,8 @@
-import {Graph, Successor} from "./Graph";
-import {DnfGoal, NodeGoal} from "./Goals";
-import {NodeLowLevel} from "./PlannerLowLevel";
 import {DNFFormula} from "../core/Types";
 import {WorldState} from "../world/World";
+import {DnfGoal, NodeGoal} from "./Goals";
+import {IGraph, Successor} from "./Graph";
+import {NodeLowLevel} from "./PlannerLowLevel";
 
 /**
  * A high level graph of large goals which are represented by goal nodes. this
@@ -10,7 +10,7 @@ import {WorldState} from "../world/World";
  * goal that needs to be fulfilled.
  * @param dnf The DNF that graph is supposed to fulfill.
  */
-export class GraphHighLevel implements Graph<NodeHighLevel> {
+export class GraphHighLevel implements IGraph<NodeHighLevel> {
     public goalTreeRoot: DnfGoal;
 
     public constructor(dnf: DNFFormula) {
@@ -59,8 +59,8 @@ export class NodeHighLevel {
             const search = goal.evaluate(this.nodeLowLevel);
             if (search.success) {
                 result.push({
-                    child: new NodeHighLevel(goal, search.state || this.nodeLowLevel),
                     action: search.path,
+                    child: new NodeHighLevel(goal, search.state || this.nodeLowLevel),
                     cost: search.cost});
             } else {
                 console.log("Failed to execute high level move");

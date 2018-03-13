@@ -1,5 +1,5 @@
 import {aStarSearch} from "../planner/AStarSearch";
-import {Graph, SearchResult, Successor} from "../planner/Graph";
+import {IGraph, SearchResult, Successor} from "../planner/Graph";
 import {Coordinate, GridGraph, GridNode} from "../planner/GridGraph";
 import {TestCase, testCases} from "./AStarTestCases";
 
@@ -17,12 +17,12 @@ const AStarTimeout = 10; // This is the timeout used when calling the AStar func
 
 /**
  * This function chekcs that a solution path is correct, and returns its cost.
- * @param {Graph<Node>} graph
+ * @param {IGraph<Node>} graph
  * @param {Node} startnode
  * @param {Array<Successor<Node>>} path
  * @returns {number | null}
  */
-function checkPath<Node>(graph: Graph<Node>, startnode: Node, path: Array<Successor<Node>>): number | null {
+function checkPath<Node>(graph: IGraph<Node>, startnode: Node, path: Array<Successor<Node>>): number | null {
     function getNeighbor(node: Node, next: Node): Successor<Node> | null {
         for (const suc of graph.successors(node)) {
             if (graph.compareNodes(next, suc.child) === 0) {

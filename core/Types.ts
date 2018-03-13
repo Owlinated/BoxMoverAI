@@ -108,31 +108,31 @@ export type Relation = "leftof" | "rightof" | "inside" | "ontop" | "under" | "be
 // Interpretations
 
 export class DNFFormula {
-    constructor(public conjuncts: Conjunction[] = []) {}
-    public toString(): string {return this.conjuncts.map((conj) => conj.toString()).join(" | "); }
     public static parse(input: string): DNFFormula {
         return new DNFFormula(input.split("|").map((conjunction) => Conjunction.parse(conjunction.trim())));
     }
+    constructor(public conjuncts: Conjunction[] = []) {}
+    public toString(): string {return this.conjuncts.map((conj) => conj.toString()).join(" | "); }
 }
 
 export class Conjunction {
-    constructor(public literals: Literal[] = []) {}
-    public toString(): string {return this.literals.map((lit) => lit.toString()).join(" & "); }
     public static parse(input: string): Conjunction {
         return new Conjunction(input.split("&").map((literal) => Literal.parse(literal.trim())));
     }
+    constructor(public literals: Literal[] = []) {}
+    public toString(): string {return this.literals.map((lit) => lit.toString()).join(" & "); }
 }
 
 // A Literal represents a relation that is intended to hold among some objects.
 export class Literal {
+    public static parse(input: string): Literal {
+        const relargs = input.split("(");
+        return new Literal(relargs[0] as Relation, relargs[1].slice(0, -1).split(","));
+    }
     constructor(
         public relation: Relation,         // The name of the relation in question
         public args: string[],           // The arguments to the relation
         public polarity: boolean = true, // Whether the literal is positive (true) or negative (false)
     ) {}
     public toString(): string {return (this.polarity ? "" : "-") + this.relation + "(" + this.args.join(",") + ")"; }
-    public static parse(input: string): Literal {
-        const relargs = input.split("(");
-        return new Literal(relargs[0] as Relation, relargs[1].slice(0, -1).split(","));
-    }
 }

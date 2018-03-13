@@ -2,7 +2,6 @@
 /* Graph
  *
  * This module contains types for generic graphs.
- * You should not edit this file.
  */
 
 /**
@@ -12,14 +11,14 @@ export class Successor<Node> {
     constructor(
     public action: string,
     public child: Node,
-    public cost: number
+    public cost: number,
     ) {}
 }
 
 /**
  * The minimal interface for a directed weighted graph
  */
-export interface Graph<Node> {
+export interface IGraph<Node> {
     compareNodes: CompareFunction<Node>;
     successors(node: Node): Array<Successor<Node>>;
 }
@@ -39,8 +38,11 @@ export type CompareFunction<T> = (a: T, b: T) => number;
 export class SearchResult<Node> {
     constructor(
         public status: "success" | "failure" | "timeout",
-        public path: Array<Successor<Node>>, // the path found by the search algorithm
-        public cost: number,            // the total cost of the path
-        public visited: number,            // the total number of nodes that have been added to the frontier
+        // the path found by the search algorithm
+        public path: Array<Successor<Node>>,
+        // the total cost of the path
+        public cost: number,
+        // the total number of nodes that have been added to the frontier
+        public visited: number,
     ) {}
 }

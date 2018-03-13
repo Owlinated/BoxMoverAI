@@ -1,5 +1,5 @@
 import {Dictionary, PriorityQueue, Set} from "typescript-collections";
-import {Graph, SearchResult, Successor} from "./Graph";
+import {IGraph, SearchResult, Successor} from "./Graph";
 
 /*
  * AStarSearch
@@ -19,7 +19,7 @@ import {Graph, SearchResult, Successor} from "./Graph";
  * @returns A search result, * which contains the path from 'start' to a node satisfying 'goal',
  *          the cost of this path, and some statistics.
  */
-export function aStarSearch<Node>(graph: Graph<Node>,
+export function aStarSearch<Node>(graph: IGraph<Node>,
                                   start: Node,
                                   goal: (n: Node) => boolean,
                                   heuristics: (n: Node) => number,

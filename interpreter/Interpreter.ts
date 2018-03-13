@@ -1,4 +1,4 @@
-import {Dictionary, util} from 'typescript-collections';
+import {Dictionary, util} from "typescript-collections";
 import {WorldState} from "../world/World";
 import {AmbiguityError} from "./AmbiguityError";
 
@@ -21,7 +21,6 @@ import {
     TakeCommand,
 } from "../core/Types";
 import {resolveParseAmbiguities} from "./AmbiguityResolver";
-import {GetSimple} from "../core/Helper";
 
 /*
  * Interpreter
@@ -67,12 +66,11 @@ export function interpret(
 
     const errors: Error[] = [];
     const possibleParses: ShrdliteResult[] = [];
-    const interpreter: Interpreter = new Interpreter(world);
 
     for (const parse of parses) {
         console.log(parse);
         try {
-            const intp: DNFFormula = interpreter.interpretCommand(parse.parse, []);
+            const intp: DNFFormula = Interpreter.interpretCommand(parse.parse, [], world);
             possibleParses.push(parse);
             parse.interpretation = intp;
         } catch (err) {
@@ -92,7 +90,7 @@ export function interpret(
     const result = resolveParseAmbiguities(possibleParses, clarifications.slice());
 
     // Run interpretation
-    result.interpretation = interpreter.interpretCommand(result.parse, clarifications);
+    result.interpretation = Interpreter.interpretCommand(result.parse, clarifications, world);
     return [result];
 }
 
@@ -103,9 +101,6 @@ export function interpret(
  * It can read the outputs of the grammar parser and convert them into DNFs for the planner.
  */
 export class Interpreter {
-    constructor(private world: WorldState) {
-    }
-
     /**
      * Floor of world
      */
@@ -115,10 +110,54 @@ export class Interpreter {
     /**
      * Cache for entities, to avoid duplicate amiguity resolutions
      */
-    private static entityCache = new Dictionary<string, EntitySemantics>();
+    public static entityCache = new Dictionary<string, IEntitySemantics>();
 
-    public interpretCommand(cmd: Command, clarifications: Clarification[][]): DNFFormula {
-        const result = Interpreter.interpretCommandInternal(cmd, clarifications, this.world);
+    /**
+     * Dictionary of functions that say if objectA is in a specific relation to objectB
+     */
+    public static relationTesters: { [relation: string]: (
+            objectA: SimpleObject,
+            stackA: number | undefined,
+            objectB: SimpleObject,
+            stackB: number | undefined,
+            world: WorldState) => boolean; } = {
+        above: (objectA, stackA, objectB, stackB, world) => {
+            if (objectB === Interpreter.floor) {
+                return true;
+            }
+            return stackA === stackB && stackA !== undefined
+                && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) >
+                world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world));
+        },
+        beside: (objectA, stackA, objectB, stackB, world) =>
+            (stackA !== undefined && stackA - 1 === stackB) || (stackB !== undefined && stackA === stackB - 1),
+        inside: (objectA, stackA, objectB, stackB, world) =>
+            stackA === stackB && stackA !== undefined
+            && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) - 1
+            === world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world))
+            && objectB.form === "box",
+        leftof: (objectA, stackA, objectB, stackB, world) =>
+            stackA !== undefined && stackB !== undefined && stackA < stackB,
+        ontop: (objectA, stackA, objectB, stackB, world) => {
+            if (objectB === Interpreter.floor) {
+                return stackA !== undefined
+                    && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) === 0;
+            }
+            return stackA === stackB && stackA !== undefined
+                && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) - 1
+                === world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world))
+                && objectB.form !== "box";
+        },
+        rightof: (objectA, stackA, objectB, stackB, world) =>
+            stackA !== undefined && stackB !== undefined && stackA > stackB,
+        under: (objectA, stackA, objectB, stackB, world) =>
+            stackA === stackB && stackA !== undefined
+            && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) <
+            world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world)),
+    };
+
+    public static interpretCommand(cmd: Command, clarifications: Clarification[][], world: WorldState): DNFFormula {
+        const result = Interpreter.interpretCommandInternal(cmd, clarifications, world);
         Interpreter.entityCache.clear();
 
         // Remove all self referencing literals
@@ -141,6 +180,8 @@ export class Interpreter {
     /**
      * The main interpretation method.
      * @param cmd: An object of type 'Command'.
+     * @param clarifications: Clarifications for resolving ambiguities
+     * @param world: The current world state for context
      * @returns: A DNFFormula representing the interpretation of the user's command.
      *           If there's an interpretation error, it throws an error with a string description.
      */
@@ -291,16 +332,18 @@ export class Interpreter {
     /**
      * Interpret a location consisting of a relation to an entity
      * @param location: The location as parsed by the grammar
+     * @param clarifications: Clarifications for resolving ambiguities
+     * @param world: The current world state for context
      * @returns: The location to build a DNF from
      */
     public static interpretLocation(location: Location, clarifications: Clarification[][], world: WorldState)
-        : LocationSemantics {
+        : ILocationSemantics {
         const entity = Interpreter.interpretEntityCached(location.entity, clarifications, world);
         return {relation: location.relation, entity};
     }
 
     public static interpretEntityCached(ent: Entity, clarifications: Clarification[][], world: WorldState)
-        : EntitySemantics {
+        : IEntitySemantics {
         const key = ent.toString();
         if (this.entityCache.containsKey(key)) {
             return this.entityCache.getValue(key)!;
@@ -313,21 +356,23 @@ export class Interpreter {
     /**
      * Interpret an entity with relation and object
      * @param ent: The entity as parsed by the grammar
+     * @param clarifications: Clarifications for resolving ambiguities
+     * @param world: The current world state for context
      * @returns: The entity to build a DNF from
      */
-    public static interpretEntity(ent: Entity, clarifications: Clarification[][], world: WorldState): EntitySemantics {
+    public static interpretEntity(ent: Entity, clarifications: Clarification[][], world: WorldState): IEntitySemantics {
         switch (ent.quantifier) {
             case "any":
                 // Return all possible objects and tell caller to pick any of them
                 return {
                     junction: Junction.Disjunction,
-                    objects: Interpreter.getObjects(ent.object, clarifications, world)
+                    objects: Interpreter.getObjects(ent.object, clarifications, world),
                 };
             case "all":
                 // Return all possible object and tell caller to match all of them
                 return {
                     junction: Junction.Conjunction,
-                    objects: Interpreter.getObjects(ent.object, clarifications, world)
+                    objects: Interpreter.getObjects(ent.object, clarifications, world),
                 };
             case "the":
                 // Find a single object matching the description and resolve ambiguities
@@ -342,6 +387,8 @@ export class Interpreter {
     /**
      * Get all objects within the world, that match the properties of the filter object
      * @param filter: The object used to filter by
+     * @param clarifications: Clarifications for resolving ambiguities
+     * @param world: The current world state for context
      * @returns: List of all matching simple objects
      */
     public static getObjects(filter: Object, clarifications: Clarification[][], world: WorldState): SimpleObject[] {
@@ -350,11 +397,17 @@ export class Interpreter {
     }
 
     /**
-     * Filter objects by matching the properties of the filter object
+     * Check if an object matches all properties of a filter
      * @param filter: The object used to filter by
+     * @param object: The object to check against the filter
+     * @param clarifications: Clarifications for resolving ambiguities
+     * @param world: The current world state for context
      * @return: List of all matching simple objects
      */
-    public static matchObject(filter: Object, object: SimpleObject, clarifications: Clarification[][], world: WorldState): boolean {
+    public static matchObject(filter: Object,
+                              object: SimpleObject,
+                              clarifications: Clarification[][],
+                              world: WorldState): boolean {
         if (filter instanceof SimpleObject) {
             if (filter.form !== "anyform" && object.form !== filter.form) {
                 return false;
@@ -376,6 +429,8 @@ export class Interpreter {
     /**
      * Resolve ambiguities between different simple objects
      * @param objects: Possible objects
+     * @param clarifications: Clarifications for resolving ambiguities
+     * @param world: The current world state for context
      * @returns: The object desired by the user
      */
     public static resolveAmbiguity(objects: SimpleObject[], clarifications: Clarification[][], world: WorldState)
@@ -414,6 +469,7 @@ export class Interpreter {
     /**
      * Checks if a literal complies with rules
      * @param literal: The literal to check
+     * @param world: The current world state for context
      * @returns: True if literal is allowed by rules, false otherwise
      */
     public static isLiteralValid(literal: Literal, world: WorldState): boolean {
@@ -510,51 +566,13 @@ export class Interpreter {
     }
 
     /**
-     * Dictionary of functions that say if objectA is in a specific relation to objectB
-     */
-    public static relationTesters: { [relation: string]: RelationTesterFunction; } = {
-        leftof: (objectA, stackA, objectB, stackB, world) =>
-            stackA !== undefined && stackB !== undefined && stackA < stackB,
-        rightof: (objectA, stackA, objectB, stackB, world) =>
-            stackA !== undefined && stackB !== undefined && stackA > stackB,
-        beside: (objectA, stackA, objectB, stackB, world) =>
-            (stackA !== undefined && stackA - 1 === stackB) || (stackB !== undefined && stackA === stackB - 1),
-        inside: (objectA, stackA, objectB, stackB, world) =>
-            stackA === stackB && stackA !== undefined
-            && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) - 1
-            === world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world))
-            && objectB.form === "box",
-        ontop: (objectA, stackA, objectB, stackB, world) => {
-            if (objectB === Interpreter.floor) {
-                return stackA !== undefined
-                    && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) === 0;
-            }
-            return stackA === stackB && stackA !== undefined
-                && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) - 1
-                === world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world))
-                && objectB.form !== "box";
-        },
-        under: (objectA, stackA, objectB, stackB, world) =>
-            stackA === stackB && stackA !== undefined
-            && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) <
-            world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world)),
-        above: (objectA, stackA, objectB, stackB, world) => {
-            if (objectB === Interpreter.floor) {
-                return true;
-            }
-            return stackA === stackB && stackA !== undefined
-                && world.stacks[stackA].indexOf(Interpreter.getObjectName(objectA, world)) >
-                world.stacks[stackA].indexOf(Interpreter.getObjectName(objectB, world));
-        }
-    };
-
-    /**
-     * Interpret a location consisting of a relation to an entity
-     * @param objects: Objects to filter by location
+     * Check if an object is at a location
+     * @param object: Objects to check
      * @param filter: The location as parsed by the grammar
-     * @returns: The objects that are in the described location
+     * @param world: The current world state for context
+     * @returns: True if the object is at the location, false otherwise
      */
-    public static matchLocation(filter: LocationSemantics, object: SimpleObject, world: WorldState): boolean {
+    public static matchLocation(filter: ILocationSemantics, object: SimpleObject, world: WorldState): boolean {
         const relationTester = (objectA: SimpleObject, objectB: SimpleObject): boolean => {
             if (filter.relation === "at any location") {
                 return true;
@@ -579,6 +597,7 @@ export class Interpreter {
     /**
      * Lookup an objects name in the world
      * @param obj: The object to look up
+     * @param world: The current world state for context
      * @returns: The name given to the object in the world
      */
     public static getObjectName(obj: SimpleObject, world: WorldState): string {
@@ -598,6 +617,7 @@ export class Interpreter {
     /**
      * Lookup an objects by its name in the world
      * @param name: The name of the object to look up
+     * @param world: The current world state for context
      * @returns: The object matching the name
      */
     public static getObject(name: string, world: WorldState): SimpleObject {
@@ -610,6 +630,7 @@ export class Interpreter {
     /**
      * Get number of stack containing object
      * @param object: Object to get stack for
+     * @param world: The current world state for context
      * @returns: The identifier of the stack containing object
      * or undefined if no stack contains object
      */
@@ -627,21 +648,18 @@ export class Interpreter {
 // Type of junction for building the DNF
 enum Junction { Disjunction, Conjunction}
 
-// Semantics of an entity, describing all objects they (might) refer to
-interface EntitySemantics {
+/**
+ * Semantics of an entity, describing all objects they (might) refer to
+ */
+interface IEntitySemantics {
     junction: Junction;
     objects: SimpleObject[];
 }
 
-// Semantics of a location, contains a relation to an entity
-interface LocationSemantics {
+/**
+ * Semantics of a location, contains a relation to an entity
+ */
+interface ILocationSemantics {
     relation: Relation;
-    entity: EntitySemantics;
+    entity: IEntitySemantics;
 }
-
-type RelationTesterFunction = (
-    objectA: SimpleObject,
-    stackA: number | undefined,
-    objectB: SimpleObject,
-    stackB: number | undefined,
-    world: WorldState) => boolean;

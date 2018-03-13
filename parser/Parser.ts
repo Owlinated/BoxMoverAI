@@ -7,28 +7,23 @@ import * as grammar from "./Grammar";
  *
  * This module parses a command given as a string by the user into a
  * list of possible parses, each of which contains an object of type 'Command'.
- *
- * You don't have to edit this file.
  */
 
-//////////////////////////////////////////////////////////////////////
-// exported functions, classes and interfaces/types
-
 /**
- * The main parse function.
- *
+ * Parses a user input using the nearley grammar.
  * @param input: A string with the input from the user.
  * @returns: A list of parse results, each containing an object of type 'Command'.
  *           If there's a parsing error, it throws an error with a string description.
  */
 export function parse(input: string): ShrdliteResult[] {
-    const the_parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
+    const parser = new nearley.Parser(nearley.Grammar.fromCompiled(grammar));
+
     // The grammar does not recognise uppercase, whitespace or punctuation,
     // so we make it lowercase and remove all whitespace and punctuation:
-    const parsestr = input.toLowerCase().replace(/\W/g, "");
+    const inputLowerCase = input.toLowerCase().replace(/\W/g, "");
     let results: Command[];
     try {
-        results = the_parser.feed(parsestr).results;
+        results = parser.feed(inputLowerCase).results;
     } catch (err) {
         if ("offset" in err) {
             throw new Error(`Parsing failed after ${err.offset} characters`);
@@ -41,9 +36,13 @@ export function parse(input: string): ShrdliteResult[] {
     }
     // We need to clone the Nearley parse result, because some parts can be shared with other parses
     return results.map((res) => new ShrdliteResult(
-        input,            // input string
-        res.clone(),      // parse result
-        new DNFFormula(), // interpretation (placeholder -- will be replaced by the Interpreter)
-        []                // plan (placeholder -- will be replaced by the Planner)
+        // input string
+        input,
+        // parse result
+        res.clone(),
+        // interpretation (placeholder -- will be replaced by the Interpreter)
+        new DNFFormula(),
+        // plan (placeholder -- will be replaced by the Planner)
+        [],
     ));
 }

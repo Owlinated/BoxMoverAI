@@ -1,12 +1,11 @@
-import {DNFFormula, SimpleObject} from "../core/Types";
+import {SimpleObject} from "../core/Types";
 import {WorldState} from "../world/World";
-import {aStarSearch} from "./AStarSearch";
-import {Graph, Successor} from "./Graph";
+import {IGraph, Successor} from "./Graph";
 
 /**
  * A graph representing possible arm movements.
  */
-export class GraphLowLevel implements Graph<NodeLowLevel> {
+export class GraphLowLevel implements IGraph<NodeLowLevel> {
     // Gets succesors for each possible arm movement.
     public successors(current: NodeLowLevel): Array<Successor<NodeLowLevel>> {
         const result = [];
@@ -34,6 +33,10 @@ export class GraphLowLevel implements Graph<NodeLowLevel> {
  * @param world   The original world state.
  */
 export class NodeLowLevel {
+    public static fromWorld(world: WorldState): NodeLowLevel {
+        return new NodeLowLevel(world.stacks, world.holding, world.arm, world);
+    }
+
     // String identifier for efficient comparison
     public id: string = "";
 
@@ -50,10 +53,6 @@ export class NodeLowLevel {
 
     public clone(): NodeLowLevel {
         return new NodeLowLevel(this.stacks, this.holding, this.arm, this.world);
-    }
-
-    public static fromWorld(world: WorldState): NodeLowLevel {
-        return new NodeLowLevel(world.stacks, world.holding, world.arm, world);
     }
 
     public toString(): string {

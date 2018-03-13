@@ -19,4 +19,5 @@ The inspiration is Shrdlu, by Terry Winograd in 1970:
 ## Getting started
  1. Download and install node and npm. 
  2. Run `npm install` to install all dependencies.
- 3. Either use `npm run start` or `npm run startoffline <params>` to start the project 
+ 3. Either use `npm start` or `npm run offline <params>` to start the project 
+ 
