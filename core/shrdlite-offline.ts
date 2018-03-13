@@ -1,8 +1,6 @@
-///<reference path="lib/node.d.ts"/>
-
-import {ExampleWorlds} from "./ExampleWorlds";
+import {ExampleWorlds} from "../world/ExampleWorlds";
+import {TextWorld} from "../world/TextWorld";
 import {parseUtteranceIntoPlan, splitStringIntoPlan} from "./Shrdlite";
-import {TextWorld} from "./TextWorld";
 
 /*
  * shrdlite-offline
@@ -46,7 +44,7 @@ for (let utter of utterances) {
     console.log("############################################################" +
                 "############################################################");
     console.log();
-    let theplan: string[] | null = splitStringIntoPlan(utter);
+    let theplan: string[] | null | string = splitStringIntoPlan(utter);
     if (!theplan) {
         theplan = parseUtteranceIntoPlan(world, utter);
     }
@@ -55,7 +53,7 @@ for (let utter of utterances) {
         process.exit(1);
     } else {
         console.log();
-        world.performPlan(theplan);
+        world.performPlan(theplan as string[]);
         world.printWorld();
     }
 }

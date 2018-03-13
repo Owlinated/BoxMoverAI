@@ -1,6 +1,6 @@
 import {AmbiguityError} from "./AmbiguityError";
-import Dictionary from "./lib/typescript-collections/src/lib/Dictionary";
-import {World, WorldState} from "./World";
+import Dictionary from "../lib/typescript-collections/src/lib/Dictionary";
+import {World, WorldState} from "../world/World";
 
 import {
     Clarification,
@@ -9,9 +9,9 @@ import {
     Literal, Location,
     MoveCommand, Object, Relation, RelativeObject,
     ShrdliteResult, SimpleObject, TakeCommand,
-} from "./Types";
+} from "../core/Types";
 
-import * as util from "./lib/typescript-collections/src/lib/util";
+import * as util from "../lib/typescript-collections/src/lib/util";
 
 /*
  * Interpreter

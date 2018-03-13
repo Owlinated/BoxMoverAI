@@ -1,5 +1,5 @@
 
-import {Coordinate} from "./GridGraph";
+import {Coordinate} from "../planner/GridGraph";
 
 /*
  * AStarTestCases

@@ -1,8 +1,8 @@
 import {aStarSearch} from "./AStarSearch";
-import {FinalNode} from "./PlannerGoals";
+import {FinalNode} from "./goals/PlannerGoals";
 import {GraphHighLevel} from "./PlannerHighLevel";
-import {ShrdliteResult} from "./Types";
-import {WorldState} from "./World";
+import {ShrdliteResult} from "../core/Types";
+import {WorldState} from "../world/World";
 
 /*
  * Planner

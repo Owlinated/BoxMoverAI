@@ -1,7 +1,7 @@
 import {Graph, SearchResult, Successor} from "./Graph";
-import Dictionary from "./lib/typescript-collections/src/lib/Dictionary";
-import PriorityQueue from "./lib/typescript-collections/src/lib/PriorityQueue";
-import Set from "./lib/typescript-collections/src/lib/Set";
+import Dictionary from "../lib/typescript-collections/src/lib/Dictionary";
+import PriorityQueue from "../lib/typescript-collections/src/lib/PriorityQueue";
+import Set from "../lib/typescript-collections/src/lib/Set";
 
 /*
  * AStarSearch

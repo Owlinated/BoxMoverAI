@@ -1,9 +1,8 @@
-
-import {ExampleWorlds} from "./ExampleWorlds";
-import "./lib/jquery";
+import "../lib/jquery";
+import {ExampleWorlds} from "../world/ExampleWorlds";
+import {SVGWorld} from "../world/SVGWorld";
+import {World} from "../world/World";
 import {parseUtteranceIntoPlan, splitStringIntoPlan} from "./Shrdlite";
-import {SVGWorld} from "./SVGWorld";
-import {World} from "./World";
 
 /*
  * shrdlite-html

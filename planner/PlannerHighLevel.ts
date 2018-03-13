@@ -1,8 +1,8 @@
 import {Graph, Successor} from "./Graph";
-import {DnfGoal, NodeGoal} from "./PlannerGoals";
+import {DnfGoal, NodeGoal} from "./goals/PlannerGoals";
 import {NodeLowLevel} from "./PlannerLowLevel";
-import {DNFFormula} from "./Types";
-import {WorldState} from "./World";
+import {DNFFormula} from "../core/Types";
+import {WorldState} from "../world/World";
 
 export class GraphHighLevel implements Graph<NodeHighLevel> {
     public goalTreeRoot: DnfGoal;

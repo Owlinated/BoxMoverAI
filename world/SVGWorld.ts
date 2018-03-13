@@ -1,5 +1,5 @@
 
-import "./lib/jquery";
+import "../lib/jquery";
 import {World, WorldState} from "./World";
 
 /*

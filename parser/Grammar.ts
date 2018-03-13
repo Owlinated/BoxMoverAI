@@ -9,7 +9,7 @@ import {
     Clarification,
     Location, Entity,
     Object, RelativeObject, SimpleObject,
-} from "./Types";
+} from "../core/Types";
 
 export interface Token { value: any; [key: string]: any };
 

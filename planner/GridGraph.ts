@@ -1,6 +1,6 @@
 
 import {Graph, Successor} from "./Graph";
-import Set from "./lib/typescript-collections/src/lib/Set";
+import Set from "../lib/typescript-collections/src/lib/Set";
 
 /*
  * GridGraph

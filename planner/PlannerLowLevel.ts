@@ -1,7 +1,7 @@
+import {DNFFormula, SimpleObject} from "../core/Types";
+import {WorldState} from "../world/World";
 import {aStarSearch} from "./AStarSearch";
 import {Graph, Successor} from "./Graph";
-import {DNFFormula, SimpleObject} from "./Types";
-import {WorldState} from "./World";
 
 /**
  * The core planner method.

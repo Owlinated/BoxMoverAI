@@ -1,6 +1,6 @@
-import {aStarSearch} from "./AStarSearch";
-import {GraphLowLevel, NodeLowLevel} from "./PlannerLowLevel";
-import {Conjunction, DNFFormula, Literal, Relation, SimpleObject} from "./Types";
+import {aStarSearch} from "../AStarSearch";
+import {GraphLowLevel, NodeLowLevel} from "../PlannerLowLevel";
+import {Conjunction, DNFFormula, Literal, Relation, SimpleObject} from "../../core/Types";
 
 // todo combine with interpreter stuff
 function describeObject(object: string, state: NodeLowLevel) {

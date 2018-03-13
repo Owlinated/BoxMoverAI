@@ -1,5 +1,5 @@
 
-import {SimpleObject} from "./Types";
+import {SimpleObject} from "../core/Types";
 
 /*
  * World

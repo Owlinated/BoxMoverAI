@@ -1,8 +1,8 @@
 
 import {ParserRules, ParserStart} from "./Grammar";
-import * as nearley from "./lib/nearley";
-import {Command, DNFFormula, ShrdliteResult} from "./Types";
-import {WorldState} from "./World";
+import * as nearley from "../lib/nearley";
+import {Command, DNFFormula, ShrdliteResult} from "../core/Types";
+import {WorldState} from "../world/World";
 
 /*
  * Parser

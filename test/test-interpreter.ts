@@ -1,10 +1,8 @@
-///<reference path="lib/node.d.ts"/>
-
-import {TextWorld} from "./TextWorld";
-import {ExampleWorlds} from "./ExampleWorlds";
-import {ShrdliteResult} from "./Types";
-import {parse} from "./Parser";
-import {interpret} from "./Interpreter";
+import {ShrdliteResult} from "../core/Types";
+import {interpret} from "../interpreter/Interpreter";
+import {parse} from "../parser/Parser";
+import {ExampleWorlds} from "../world/ExampleWorlds";
+import {TextWorld} from "../world/TextWorld";
 import {TestCase, testCases} from "./InterpreterTestCases";
 
 /********************************************************************************
@@ -15,7 +13,6 @@ It tests against several test cases that are defined in InterpreterTestCases.ts
 
 You should not edit this file.
 ********************************************************************************/
-
 
 function runTest(testcase : TestCase) : boolean {
     var world = new TextWorld(ExampleWorlds[testcase.world]);
